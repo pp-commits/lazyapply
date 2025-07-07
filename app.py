@@ -1,6 +1,7 @@
 import streamlit as st
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback
+from utils.history import save_match, get_history
 
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 
@@ -19,9 +20,9 @@ if uploaded_file and jd_text:
     resume_text = parse_resume(uploaded_file)
     
     if resume_text.strip():
-        with st.spinner("🧠 Thinking..."):
+        with st.spinner("🧠 Analyzing..."):
             feedback = get_match_feedback(resume_text, jd_text)
-        
+        save_match(resume_text, jd_text, feedback)
         st.subheader("📊 Match Feedback")
         st.text_area("📝 AI Feedback", feedback, height=300)
 
@@ -41,3 +42,16 @@ if uploaded_file and jd_text:
         st.warning("Resume text could not be extracted.")
 else:
     st.info("Please upload a resume and paste a job description.")
+# Show Match History Section
+
+with st.expander("🕓 View Match History"):
+    history = get_history()
+    if not history:
+        st.info("No past matches yet.")
+    else:
+        for i, entry in enumerate(history[:5]):  # show latest 5 entries
+            st.markdown(f"### 🔹 Match #{i+1} — {entry['timestamp']}")
+            st.markdown(f"**Resume Snippet:**\n{entry['resume_excerpt']}...")
+            st.markdown(f"**JD Snippet:**\n{entry['jd_excerpt']}...")
+            st.text_area("📊 Feedback", entry['feedback'], height=150, key=f"feedback_{i}")
+            st.markdown("---")
