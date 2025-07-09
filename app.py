@@ -26,7 +26,8 @@ with tab1:
             st.subheader("📊 Match Feedback")
             st.text_area("📝 AI Feedback", feedback, height=300)
 
-            st.button("📋 Copy to Clipboard", on_click=lambda: st.session_state.update({"copied": True}))
+            if st.button("📋 Copy to Clipboard"):
+                st.session_state["copied"] = True
             if st.session_state.get("copied"):
                 st.success("Copied!")
 
@@ -57,9 +58,10 @@ with tab2:
                 st.markdown(f"**Location**: {job['location']}")
                 st.markdown(f"**Link**: [Apply Here]({job['link']})")
                 st.markdown(f"**Summary**:\n\n{job['summary']}")
-                
+
                 if uploaded_file:
-                    if st.button(f"⚡ Match My Resume with {job['title']}", key=job['title']):
+                    unique_key = f"{job['title']}_{job['link'].split('/')[-1]}"
+                    if st.button(f"⚡ Match My Resume with {job['title']}", key=unique_key):
                         resume_text = parse_resume(uploaded_file)
                         with st.spinner("Matching in progress..."):
                             feedback = get_match_feedback(resume_text, job['summary'])
@@ -67,4 +69,3 @@ with tab2:
                         st.text_area("📊 Feedback", feedback, height=300)
                 else:
                     st.info("Upload resume in Tab 1 to enable matching.")
-
