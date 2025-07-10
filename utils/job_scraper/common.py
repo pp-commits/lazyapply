@@ -1,5 +1,4 @@
 import requests
-
 def fetch_greenhouse_jobs(company_slug, limit=10, keyword=None):
     try:
         url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs?content=true"

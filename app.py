@@ -1,47 +1,15 @@
 import streamlit as st
-import requests
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback
+from utils.job_scraper.common import fetch_greenhouse_jobs  # 👈 Clean import
 
 # ------------ Config for Supported Companies ------------
 SUPPORTED_COMPANIES = {
     "Razorpay": "razorpaysoftwareprivatelimited",
     "Postman": "postman",
     "Turing": "turing",
-    "Freshworks": "freshworks",
-    "Unacademy": "unacademy",
     "Groww": "groww"
 }
-
-# ------------ Common Job Fetching Function ------------
-def fetch_greenhouse_jobs(company_slug, limit=10, keyword=None):
-    try:
-        url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs?content=true"
-        res = requests.get(url, timeout=10)
-        res.raise_for_status()
-        data = res.json()
-
-        jobs = []
-        for job in data.get("jobs", []):
-            title = job["title"]
-            if keyword and keyword.lower() not in title.lower():
-                continue
-
-            jobs.append({
-                "title": title,
-                "location": job["location"]["name"] if job.get("location") else "Remote",
-                "company": company_slug.capitalize(),
-                "summary": job.get("content", "")[:500],
-                "link": job["absolute_url"]
-            })
-
-            if len(jobs) >= limit:
-                break
-
-        return jobs
-
-    except Exception as e:
-        return f"❌ Error fetching jobs for {company_slug}: {e}"
 
 # ------------ Streamlit UI ------------
 st.set_page_config(page_title="LazyApply AI", layout="centered")
