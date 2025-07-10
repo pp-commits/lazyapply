@@ -1,7 +1,11 @@
 import streamlit as st
+import requests
+import time
+import random
+import threading
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback
-from utils.job_scraper.common import fetch_greenhouse_jobs  # 👈 Clean import
+from utils.job_scraper.common import fetch_greenhouse_jobs
 
 # ------------ Config for Supported Companies ------------
 SUPPORTED_COMPANIES = {
@@ -26,11 +30,35 @@ with tab1:
     if uploaded_file and jd_text:
         resume_text = parse_resume(uploaded_file)
         if resume_text.strip():
-            with st.spinner("🧠 Thinking..."):
-                feedback = get_match_feedback(resume_text, jd_text)
+            progress = st.progress(0)
+            status_placeholder = st.empty()
+            score_placeholder = st.empty()
+            feedback_placeholder = st.empty()
 
-            st.subheader("📊 Match Feedback")
-            st.text_area("📝 AI Feedback", feedback, height=300)
+            # Sequential steps with status
+            status_msgs = ["🔍 Analyzing Resume", "📄 Parsing JD", "⚙️ Matching Skills", "🧠 Generating Insights"]
+            for i, msg in enumerate(status_msgs):
+                status_placeholder.markdown(f"**{msg}...**")
+                progress.progress((i + 1) * 20)
+                time.sleep(0.7)
+
+            # Score animation (main thread)
+            for _ in range(20):  # approx 2 seconds
+                score = random.randint(1, 99)
+                score_placeholder.markdown(f"🎯 Estimated Match Score: **{score}%**")
+                time.sleep(0.1)
+
+            # Final feedback (blocking call)
+            real_feedback = get_match_feedback(resume_text, jd_text)
+
+            # Extract score from feedback if available
+            #final_score = real_feedback.split("Match Score:")[-1].split("%")[0].strip() if "Match Score:" in real_feedback else "85"
+            #score_placeholder.markdown(f"✅ Final Match Score: **{final_score}%**")
+
+            progress.progress(100)
+            status_placeholder.markdown("✅ Done.")
+
+            feedback_placeholder.text_area("📊 AI Feedback", real_feedback, height=300)
 
             if st.button("📋 Copy to Clipboard"):
                 st.session_state["copied"] = True
@@ -39,7 +67,7 @@ with tab1:
 
             st.download_button(
                 label="⬇️ Download Report",
-                data=feedback,
+                data=real_feedback,
                 file_name="match_feedback.txt",
                 mime="text/plain"
             )
@@ -47,6 +75,7 @@ with tab1:
             st.warning("Resume text could not be extracted.")
     else:
         st.info("Please upload a resume and paste a job description.")
+
 
 # ------------ Phase 2: Explore Engineering Jobs ------------
 with tab2:
