@@ -1,16 +1,55 @@
 import streamlit as st
+import requests
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback
-from utils.history import save_match, get_history
-from utils.job_scraper.razorpay import fetch_jobs  # ✅ Razorpay fetch function
 
+# ------------ Config for Supported Companies ------------
+SUPPORTED_COMPANIES = {
+    "Razorpay": "razorpaysoftwareprivatelimited",
+    "Postman": "postman",
+    "Turing": "turing",
+    "Freshworks": "freshworks",
+    "Unacademy": "unacademy",
+    "Groww": "groww"
+}
+
+# ------------ Common Job Fetching Function ------------
+def fetch_greenhouse_jobs(company_slug, limit=10, keyword=None):
+    try:
+        url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs?content=true"
+        res = requests.get(url, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+
+        jobs = []
+        for job in data.get("jobs", []):
+            title = job["title"]
+            if keyword and keyword.lower() not in title.lower():
+                continue
+
+            jobs.append({
+                "title": title,
+                "location": job["location"]["name"] if job.get("location") else "Remote",
+                "company": company_slug.capitalize(),
+                "summary": job.get("content", "")[:500],
+                "link": job["absolute_url"]
+            })
+
+            if len(jobs) >= limit:
+                break
+
+        return jobs
+
+    except Exception as e:
+        return f"❌ Error fetching jobs for {company_slug}: {e}"
+
+# ------------ Streamlit UI ------------
 st.set_page_config(page_title="LazyApply AI", layout="centered")
-
 st.title("🤖 LazyApply AI — Your Job Buddy!")
 
 tab1, tab2 = st.tabs(["📄 Match Resume", "🧭 Explore Jobs"])
 
-# ---------------------- Phase 1 ----------------------
+# ------------ Phase 1: Resume Matching ------------
 with tab1:
     st.markdown("Upload your resume and paste a job description to get match feedback.")
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
@@ -18,7 +57,6 @@ with tab1:
 
     if uploaded_file and jd_text:
         resume_text = parse_resume(uploaded_file)
-
         if resume_text.strip():
             with st.spinner("🧠 Thinking..."):
                 feedback = get_match_feedback(resume_text, jd_text)
@@ -42,10 +80,14 @@ with tab1:
     else:
         st.info("Please upload a resume and paste a job description.")
 
-# ---------------------- Phase 2 ----------------------
+# ------------ Phase 2: Explore Engineering Jobs ------------
 with tab2:
-    st.markdown("🧠 Showing engineering roles at **Razorpay** via official job board")
-    jobs = fetch_jobs(limit=10, keyword="engineering")
+    st.markdown("🧠 Select a company to explore engineering jobs:")
+
+    selected_company = st.selectbox("🏢 Choose a company", list(SUPPORTED_COMPANIES.keys()))
+    company_slug = SUPPORTED_COMPANIES[selected_company]
+
+    jobs = fetch_greenhouse_jobs(company_slug, limit=10, keyword="engineering")
 
     if isinstance(jobs, str):
         st.error(jobs)
@@ -54,7 +96,7 @@ with tab2:
     else:
         for job in jobs:
             with st.expander(f"🔧 {job['title']} – {job['location']}"):
-                st.markdown(f"**Company**: {job['company']}")
+                st.markdown(f"**Company**: {selected_company}")
                 st.markdown(f"**Location**: {job['location']}")
                 st.markdown(f"**Link**: [Apply Here]({job['link']})")
                 st.markdown(f"**Summary**:\n\n{job['summary']}")
