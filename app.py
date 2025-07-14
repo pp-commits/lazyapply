@@ -1,8 +1,5 @@
 import streamlit as st
-import requests
 import time
-import random
-import threading
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback
 from utils.job_scraper.common import fetch_greenhouse_jobs
@@ -14,6 +11,8 @@ SUPPORTED_COMPANIES = {
     "Turing": "turing",
     "Groww": "groww"
 }
+
+status_steps = ["🔍 Scanning Resume", "🧠 Analyzing JD", "📊 Matching Skills", "📚 Compiling Feedback", "🎯 Finalizing Result"]
 
 # ------------ Streamlit UI ------------
 st.set_page_config(page_title="LazyApply AI", layout="centered")
@@ -30,35 +29,26 @@ with tab1:
     if uploaded_file and jd_text:
         resume_text = parse_resume(uploaded_file)
         if resume_text.strip():
-            progress = st.progress(0)
+            st.subheader("📊 Match Feedback")
+            progress_bar = st.progress(0)
             status_placeholder = st.empty()
-            score_placeholder = st.empty()
-            feedback_placeholder = st.empty()
 
-            # Sequential steps with status
-            status_msgs = ["🔍 Analyzing Resume", "📄 Parsing JD", "⚙️ Matching Skills", "🧠 Generating Insights"]
-            for i, msg in enumerate(status_msgs):
-                status_placeholder.markdown(f"**{msg}...**")
-                progress.progress((i + 1) * 20)
-                time.sleep(0.7)
+            # Simulate step-by-step loading
+            step_count = len(status_steps)
+            for i, step in enumerate(status_steps):
+                progress_bar.progress((i + 1) / step_count)
+                status_placeholder.markdown(step)
+                time.sleep(0.6)  # adjust for pacing
 
-            # Score animation (main thread)
-            for _ in range(20):  # approx 2 seconds
-                score = random.randint(1, 99)
-                score_placeholder.markdown(f"🎯 Estimated Match Score: **{score}%**")
-                time.sleep(0.1)
+            # Final processing (simulate real load if needed)
+            feedback = get_match_feedback(resume_text, jd_text)
 
-            # Final feedback (blocking call)
-            real_feedback = get_match_feedback(resume_text, jd_text)
+            # Clear loading elements
+            progress_bar.empty()
+            status_placeholder.empty()
 
-            # Extract score from feedback if available
-            #final_score = real_feedback.split("Match Score:")[-1].split("%")[0].strip() if "Match Score:" in real_feedback else "85"
-            #score_placeholder.markdown(f"✅ Final Match Score: **{final_score}%**")
-
-            progress.progress(100)
-            status_placeholder.markdown("✅ Done.")
-
-            feedback_placeholder.text_area("📊 AI Feedback", real_feedback, height=300)
+            # Show results
+            st.text_area("📝 AI Feedback", feedback, height=300)
 
             if st.button("📋 Copy to Clipboard"):
                 st.session_state["copied"] = True
@@ -67,7 +57,7 @@ with tab1:
 
             st.download_button(
                 label="⬇️ Download Report",
-                data=real_feedback,
+                data=feedback,
                 file_name="match_feedback.txt",
                 mime="text/plain"
             )
@@ -75,7 +65,6 @@ with tab1:
             st.warning("Resume text could not be extracted.")
     else:
         st.info("Please upload a resume and paste a job description.")
-
 
 # ------------ Phase 2: Explore Engineering Jobs ------------
 with tab2:
@@ -102,8 +91,21 @@ with tab2:
                     unique_key = f"{job['title']}_{job['link'].split('/')[-1]}"
                     if st.button(f"⚡ Match My Resume with {job['title']}", key=unique_key):
                         resume_text = parse_resume(uploaded_file)
-                        with st.spinner("Matching in progress..."):
-                            feedback = get_match_feedback(resume_text, job['summary'])
+
+                        # Begin Loading
+                        progress_bar = st.progress(0)
+                        status_placeholder = st.empty()
+                        for i, step in enumerate(status_steps):
+                            progress_bar.progress((i + 1) / step_count)
+                            status_placeholder.markdown(step)
+                            time.sleep(0.6)
+
+                        feedback = get_match_feedback(resume_text, job['summary'])
+
+                        # Clear loading
+                        progress_bar.empty()
+                        status_placeholder.empty()
+
                         st.success("✅ Match completed!")
                         st.text_area("📊 Feedback", feedback, height=300)
                 else:
