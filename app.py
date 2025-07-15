@@ -3,7 +3,7 @@ import requests
 import time
 import random
 from utils.resume_parser import parse_resume
-from utils.matcher import get_match_feedback
+from utils.matcher import get_match_feedback, get_batched_match_feedback
 from utils.job_scraper.common import fetch_greenhouse_jobs
 
 # ------------ Config for Supported Companies ------------
@@ -13,6 +13,14 @@ SUPPORTED_COMPANIES = {
     "Turing": "turing",
     "Groww": "groww"
 }
+
+# ------------ Phase 2: Explore Jobs Logic FIRST (but visually second) ------------
+if "job_cache" not in st.session_state:
+    all_jobs = {}
+    for comp_name, slug in SUPPORTED_COMPANIES.items():
+        jobs = fetch_greenhouse_jobs(slug, limit=3, keyword="engineering")
+        all_jobs[comp_name] = jobs
+    st.session_state["job_cache"] = all_jobs
 
 # ------------ Streamlit UI ------------
 st.set_page_config(page_title="LazyApply AI", layout="centered")
@@ -26,8 +34,12 @@ with tab1:
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
     jd_text = st.text_area("💼 Paste the job description here", height=250)
 
-    if uploaded_file and jd_text:
+    if uploaded_file:
         resume_text = parse_resume(uploaded_file)
+    else:
+        resume_text = None
+
+    if resume_text and jd_text:
         if resume_text.strip():
             progress = st.progress(0)
             status_placeholder = st.empty()
@@ -52,7 +64,7 @@ with tab1:
 
             st.download_button(
                 label="⬇️ Download Report",
-                data=real_feedback[0] if isinstance(real_feedback, tuple) else real_feedback,
+                data=real_feedback[0].encode("utf-8") if isinstance(real_feedback, tuple) else real_feedback.encode("utf-8"),
                 file_name="match_feedback.txt",
                 mime="text/plain"
             )
@@ -61,33 +73,39 @@ with tab1:
             st.markdown("---")
             st.subheader("📌 Similar Jobs You May Like")
 
-            all_jobs = []
-            for comp_name, slug in SUPPORTED_COMPANIES.items():
-                if comp_name != "Razorpay":  # avoid repeating the same job
-                    jobs = fetch_greenhouse_jobs(slug, limit=2, keyword="engineering")
-                    all_jobs.extend([(comp_name, job) for job in jobs if isinstance(jobs, list)])
+            all_jobs = st.session_state["job_cache"]
+            flat_jobs = []
+            for comp_name, job_list in all_jobs.items():
+                for job in job_list:
+                    flat_jobs.append({"company": comp_name, **job})
+
+            summaries = [job["summary"] for job in flat_jobs]
+            feedbacks = get_batched_match_feedback(resume_text, summaries)
 
             scored_jobs = []
-            with st.spinner("🔢 Evaluating match scores for similar jobs..."):
-                for comp_name, job in all_jobs:
-                    try:
-                        match_result = get_match_feedback(resume_text, job["summary"])
-                        score_text = match_result[0] if isinstance(match_result, tuple) else match_result
+            debug_logs = []
 
-                        lines = score_text.splitlines()
-                        match_line = next((line for line in lines if "Match Score:" in line), None)
+            for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
+                try:
+                    if not isinstance(feedback, str):
+                        feedback = feedback.get("feedback", "")
 
-                        if match_line:
-                            score_val = int(match_line.split(":")[1].split("/")[0].strip())
-                            scored_jobs.append({
-                                "company": comp_name,
-                                "title": job["title"],
-                                "location": job["location"],
-                                "score": score_val,
-                                "link": job["link"]
-                            })
-                    except Exception as e:
-                        st.write(f"⚠️ Failed to score job: {job['title']} at {comp_name} — Skipped")
+                    lines = feedback.splitlines()
+                    match_line = next((line for line in lines if "Match Score:" in line), None)
+
+                    if match_line:
+                        score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
+                        scored_jobs.append({
+                            "company": job["company"],
+                            "title": job["title"],
+                            "location": job["location"],
+                            "score": score_val,
+                            "link": job["link"]
+                        })
+                    else:
+                        debug_logs.append(f"Job {idx+1}: Match Score not found in response")
+                except Exception as e:
+                    debug_logs.append(f"Job {idx+1} Failed: {str(e)}")
 
             if scored_jobs:
                 sorted_jobs = sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]
@@ -96,11 +114,18 @@ with tab1:
                         st.markdown(f"**Location**: {job['location']}")
                         st.markdown(f"**Apply**: [Click here]({job['link']})")
             else:
-                st.info("No similar job matches found.")
+                st.warning("No valid scores returned from LLM.")
+
+            if debug_logs:
+                st.markdown("**Debug Info:**")
+                for log in debug_logs:
+                    st.markdown(f"- {log}")
         else:
             st.warning("Resume text could not be extracted.")
+    elif not uploaded_file:
+        st.info("Please upload a resume.")
     else:
-        st.info("Please upload a resume and paste a job description.")
+        st.info("Please paste a job description.")
 
 # ------------ Phase 2: Explore Jobs ------------
 with tab2:
