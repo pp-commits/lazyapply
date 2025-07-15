@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import time
 import random
-import threading
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback, get_batched_match_feedback
 from utils.job_scraper.common import fetch_greenhouse_jobs
@@ -44,33 +43,19 @@ with tab1:
         if resume_text.strip():
             progress = st.progress(0)
             status_placeholder = st.empty()
-            score_placeholder = st.empty()
             feedback_placeholder = st.empty()
 
-            # Sequential steps with status
             status_msgs = ["🔍 Analyzing Resume", "📄 Parsing JD", "⚙️ Matching Skills", "🧠 Generating Insights"]
             for i, msg in enumerate(status_msgs):
                 status_placeholder.markdown(f"**{msg}...**")
                 progress.progress((i + 1) * 20)
                 time.sleep(0.7)
 
-            # Score animation (main thread)
-            for _ in range(20):  # approx 2 seconds
-                score = random.randint(1, 99)
-                score_placeholder.markdown(f"🎯 Estimated Match Score: **{score}%**")
-                time.sleep(0.1)
-
-            # Final feedback (blocking call)
+            # Final feedback
             real_feedback = get_match_feedback(resume_text, jd_text)
-
-            # Extract score from feedback if available
-            #final_score = real_feedback.split("Match Score:")[-1].split("%")[0].strip() if "Match Score:" in real_feedback else "85"
-            #score_placeholder.markdown(f"✅ Final Match Score: **{final_score}%**")
-
             progress.progress(100)
             status_placeholder.markdown("✅ Done.")
-
-            feedback_placeholder.text_area("📊 AI Feedback", real_feedback, height=300)
+            feedback_placeholder.text_area("📊 AI Feedback", real_feedback if isinstance(real_feedback, str) else real_feedback[0], height=300)
 
             if st.button("📋 Copy to Clipboard"):
                 st.session_state["copied"] = True
@@ -145,15 +130,12 @@ with tab1:
 # ------------ Phase 2: Explore Jobs ------------
 with tab2:
     st.markdown("🧠 Select a company and search job roles:")
-
     selected_company = st.selectbox("🏢 Choose a company", list(SUPPORTED_COMPANIES.keys()))
     company_slug = SUPPORTED_COMPANIES[selected_company]
-
     keyword = st.text_input("🔍 Search by keyword", value="engineering")
 
     if keyword:
         jobs = fetch_greenhouse_jobs(company_slug, limit=10, keyword=keyword)
-
         if isinstance(jobs, str):
             st.error(jobs)
         elif not jobs:
@@ -173,9 +155,8 @@ with tab2:
                             with st.spinner("Matching in progress..."):
                                 feedback = get_match_feedback(resume_text, job['summary'])
                             st.success("✅ Match completed!")
-                            st.text_area("📊 Feedback", feedback, height=300)
+                            st.text_area("📊 Feedback", feedback if isinstance(feedback, str) else feedback[0], height=300)
                     else:
                         st.info("Upload resume in Tab 1 to enable matching.")
     else:
         st.info("Please enter a keyword to search job roles.")
-
