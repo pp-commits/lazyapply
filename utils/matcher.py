@@ -1,6 +1,7 @@
 
 
 import ollama  
+import re
 
 def get_match_feedback(resume_text, jd_text):
     prompt = f"""
@@ -57,5 +58,9 @@ ATS Optimization Tip (Optional):
         model='llama3',  # Or use 'mistral' or another model you installed
         messages=[{"role": "user", "content": prompt}]
     )
+    full_feedback = response['message']['content']
+    # Extract match score using regex
+    match = re.search(r"Match Score:\s*(\d{1,3})\/100", full_feedback)
+    match_score = int(match.group(1)) if match else 0
 
-    return response['message']['content']
+    return full_feedback, match_score
