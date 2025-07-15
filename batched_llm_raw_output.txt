@@ -1,0 +1,51 @@
+Here are the match scores:
+
+Job 1:
+Title: Engineering Manager
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;span style=&quot;font-family: arial, helvetica, sans-serif; font-size: 12pt;&quot;&gt;Razorpay was founded by&lt;a href=&quot;https://www.linkedin.com/in/kumarshashank/&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://www.linkedin.com/in/kumarshashank/&amp;amp;source=gmail&amp;amp;ust=1660290870959000&amp;amp;usg=AOvVaw1H2eeqfjnUDt3iT_Cg-jfh&quot;&gt; Shashank Kumar&lt;/a&gt; and&lt;a href=&quo
+Job 1 Match Score: 60/100
+
+Job 2:
+Title: Engineering Manager
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;span style=&quot;font-family: arial, helvetica, sans-serif; font-size: 12pt;&quot;&gt;Razorpay was founded by&lt;a href=&quot;https://www.linkedin.com/in/kumarshashank/&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://www.linkedin.com/in/kumarshashank/&amp;amp;source=gmail&amp;amp;ust=1660290870959000&amp;amp;usg=AOvVaw1H2eeqfjnUDt3iT_Cg-jfh&quot;&gt; Shashank Kumar&lt;/a&gt; and&lt;a href=&quo
+Job 2 Match Score: 60/100
+
+Job 3:
+Title: Senior Engineering Manager
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;span style=&quot;font-family: arial, helvetica, sans-serif; font-size: 12pt;&quot;&gt;Razorpay was founded by&lt;a href=&quot;https://www.linkedin.com/in/kumarshashank/&quot; target=&quot;_blank&quot; data-saferedirecturl=&quot;https://www.google.com/url?q=https://www.linkedin.com/in/kumarshashank/&amp;amp;source=gmail&amp;amp;ust=1660290870959000&amp;amp;usg=AOvVaw1H2eeqfjnUDt3iT_Cg-jfh&quot;&gt; Shashank Kumar&lt;/a&gt; and&lt;a href=&quo
+Job 3 Match Score: 65/100
+
+Job 4:
+Title: Engineering Manager, Workspaces
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;h2&gt;&lt;strong&gt;Who Are We?&lt;/strong&gt;&lt;/h2&gt;
+Job 4 Match Score: 40/100
+
+Job 5:
+Title: Frontend Software Engineer, Growth Engineering
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;h2&gt;&lt;strong&gt;Who Are We?&lt;/strong&gt;&lt;/h2&gt;
+Job 5 Match Score: 30/100
+
+Job 6:
+Title: Senior Engineering Manager, Ecosystems
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;h2&gt;&lt;strong&gt;Who Are We?&lt;/strong&gt;&lt;/h2&gt;
+Job 6 Match Score: 40/100
+
+Job 7:
+Title: Delivery Engineering Director
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong data-stringify-type=&quot;bold&quot;&gt;About Turing&lt;/strong&gt;&lt;/p&gt;
+Job 7 Match Score: 55/100
+
+Job 8:
+Title: Engineering Lead – AI Prototyping (UltraLab)
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong data-stringify-type=&quot;bold&quot;&gt;About Turing&lt;/strong&gt;&lt;/p&gt;
+Job 8 Match Score: 50/100
+
+Job 9:
+Title: GenAI Engineering Manager
+Summary: &lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;&lt;strong data-stringify-type=&quot;bold&quot;&gt;About Turing&lt;/strong&gt;&lt;/p&gt;
+Job 9 Match Score: 45/100
+
+Job 10:
+Title: Site Reliability Engineer - Engineering Manager
+Summary: &lt;div&gt;&lt;strong&gt;About Groww:&lt;/strong&gt;&lt;/div&gt;
+Job 10 Match Score: 70/100
