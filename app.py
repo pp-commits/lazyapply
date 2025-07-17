@@ -1,12 +1,11 @@
-# --- (Top imports remain unchanged) ---
 import streamlit as st
 import requests
 import time
-import random
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback, get_batched_match_feedback
-from utils.job_scraper.common import fetch_greenhouse_jobs
+from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
 
+# ------------ Config for Supported Companies ------------
 SUPPORTED_COMPANIES = {
     "Razorpay": "razorpaysoftwareprivatelimited",
     "Postman": "postman",
@@ -14,7 +13,7 @@ SUPPORTED_COMPANIES = {
     "Groww": "groww"
 }
 
-# --- Fetch & cache jobs ---
+# ------------ Phase 2: Explore Jobs Logic FIRST ------------
 if "job_cache" not in st.session_state:
     all_jobs = {}
     for comp_name, slug in SUPPORTED_COMPANIES.items():
@@ -27,6 +26,7 @@ st.title("🤖 LazyApply AI — Your Job Buddy!")
 
 tab1, tab2 = st.tabs(["📄 Match Resume", "🧭 Explore Jobs"])
 
+# ------------ Phase 1: Resume Matching ------------
 with tab1:
     st.markdown("Upload your resume and paste a job description to get match feedback.")
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
@@ -66,58 +66,68 @@ with tab1:
                 mime="text/plain"
             )
 
-            # --------- Reintroduced Spinner for Similar Jobs Section ----------
+            # ---------- Show Similar Jobs with Scores ----------
             st.markdown("---")
             st.subheader("📌 Similar Jobs You May Like")
-            with st.spinner("Analyzing similar jobs..."):
 
-                all_jobs = st.session_state["job_cache"]
-                flat_jobs = []
-                for comp_name, job_list in all_jobs.items():
-                    for job in job_list:
-                        flat_jobs.append({"company": comp_name, **job})
+            all_jobs = st.session_state["job_cache"]
+            flat_jobs = []
+            for comp_name, job_list in all_jobs.items():
+                for job in job_list:
+                    flat_jobs.append({"company": comp_name, **job})
 
-                summaries = [job["summary"] for job in flat_jobs]
-                feedbacks = get_batched_match_feedback(resume_text, summaries)
+            summaries = [job["summary"] for job in flat_jobs]
+            feedbacks = get_batched_match_feedback(resume_text, summaries)
 
-                scored_jobs = []
-                debug_logs = []
+            scored_jobs = []
+            debug_logs = []
 
-                for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
-                    try:
-                        if not isinstance(feedback, str):
-                            feedback = feedback.get("feedback", "")
+            for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
+                try:
+                    if not isinstance(feedback, str):
+                        feedback = feedback.get("feedback", "")
 
-                        lines = feedback.splitlines()
-                        match_line = next((line for line in lines if "Match Score:" in line), None)
+                    lines = feedback.splitlines()
+                    match_line = next((line for line in lines if "Match Score:" in line), None)
 
-                        if match_line:
-                            score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
-                            scored_jobs.append({
-                                "company": job["company"],
-                                "title": job["title"],
-                                "location": job["location"],
-                                "score": score_val,
-                                "link": job["link"]
-                            })
-                        else:
-                            debug_logs.append(f"Job {idx+1}: Match Score not found in response")
-                    except Exception as e:
-                        debug_logs.append(f"Job {idx+1} Failed: {str(e)}")
+                    if match_line:
+                        score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
+                        scored_jobs.append({
+                            "company": job["company"],
+                            "title": job["title"],
+                            "location": job["location"],
+                            "score": score_val,
+                            "link": job["link"],
+                            "summary": job["summary"]
+                        })
+                    else:
+                        debug_logs.append(f"Job {idx+1}: Match Score not found in response")
+                except Exception as e:
+                    debug_logs.append(f"Job {idx+1} Failed: {str(e)}")
 
-                if scored_jobs:
-                    sorted_jobs = sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]
-                    for job in sorted_jobs:
-                        with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
-                            st.markdown(f"**Location**: {job['location']}")
-                            st.markdown(f"**Apply**: [Click here]({job['link']})")
-                else:
-                    st.warning("No valid scores returned from LLM.")
+            if scored_jobs:
+                sorted_jobs = sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]
+                for job in sorted_jobs:
+                    with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
+                        st.markdown(f"**Location**: {job['location']}")
+                        st.markdown(f"**Apply**: [Click here]({job['link']})")
 
-                if debug_logs:
-                    st.markdown("**Debug Info:**")
-                    for log in debug_logs:
-                        st.markdown(f"- {log}")
+                        if st.button(f"🔍 Recalculate with Full JD for '{job['title']}'", key=f"recalc_{job['title']}"):
+                            with st.spinner("Fetching full JD and rescoring..."):
+                                full_jd = fetch_full_job_description(job["link"])
+                                if full_jd:
+                                    new_feedback, new_score = get_match_feedback(resume_text, full_jd)
+                                    st.success(f"✅ Updated Match Score: {new_score}/100")
+                                    st.text_area("📊 Updated Feedback", new_feedback, height=300)
+                                else:
+                                    st.error("⚠️ Could not fetch full job description.")
+            else:
+                st.warning("No valid scores returned from LLM.")
+
+            if debug_logs:
+                st.markdown("**Debug Info:**")
+                for log in debug_logs:
+                    st.markdown(f"- {log}")
         else:
             st.warning("Resume text could not be extracted.")
     elif not uploaded_file:
@@ -125,6 +135,7 @@ with tab1:
     else:
         st.info("Please paste a job description.")
 
+# ------------ Phase 2: Explore Jobs ------------
 with tab2:
     st.markdown("🧠 Select a company and search job roles:")
     selected_company = st.selectbox("🏢 Choose a company", list(SUPPORTED_COMPANIES.keys()))
