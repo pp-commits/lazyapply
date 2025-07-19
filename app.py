@@ -1,16 +1,9 @@
 import streamlit as st
 import requests
 import time
-<<<<<<< HEAD
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback, get_batched_match_feedback
 from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
-=======
-import random
-from utils.resume_parser import parse_resume
-from utils.matcher import get_match_feedback, get_batched_match_feedback
-from utils.job_scraper.common import fetch_greenhouse_jobs
->>>>>>> dcc225fe09ee9c9694aa93b9afa1a5f0a98ddd3e
 
 # ------------ Config for Supported Companies ------------
 SUPPORTED_COMPANIES = {
@@ -20,11 +13,7 @@ SUPPORTED_COMPANIES = {
     "Groww": "groww"
 }
 
-<<<<<<< HEAD
 # ------------ Phase 2: Explore Jobs Logic FIRST ------------
-=======
-# ------------ Phase 2: Explore Jobs Logic FIRST (but visually second) ------------
->>>>>>> dcc225fe09ee9c9694aa93b9afa1a5f0a98ddd3e
 if "job_cache" not in st.session_state:
     all_jobs = {}
     for comp_name, slug in SUPPORTED_COMPANIES.items():
@@ -32,10 +21,6 @@ if "job_cache" not in st.session_state:
         all_jobs[comp_name] = jobs
     st.session_state["job_cache"] = all_jobs
 
-<<<<<<< HEAD
-=======
-# ------------ Streamlit UI ------------
->>>>>>> dcc225fe09ee9c9694aa93b9afa1a5f0a98ddd3e
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 st.title("🤖 LazyApply AI — Your Job Buddy!")
 
@@ -64,10 +49,6 @@ with tab1:
                 progress.progress((i + 1) * 20)
                 time.sleep(0.7)
 
-<<<<<<< HEAD
-=======
-            # Final feedback
->>>>>>> dcc225fe09ee9c9694aa93b9afa1a5f0a98ddd3e
             real_feedback = get_match_feedback(resume_text, jd_text)
             progress.progress(100)
             status_placeholder.markdown("✅ Done.")
@@ -116,12 +97,8 @@ with tab1:
                             "title": job["title"],
                             "location": job["location"],
                             "score": score_val,
-<<<<<<< HEAD
                             "link": job["link"],
                             "summary": job["summary"]
-=======
-                            "link": job["link"]
->>>>>>> dcc225fe09ee9c9694aa93b9afa1a5f0a98ddd3e
                         })
                     else:
                         debug_logs.append(f"Job {idx+1}: Match Score not found in response")
@@ -134,7 +111,6 @@ with tab1:
                     with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
                         st.markdown(f"**Location**: {job['location']}")
                         st.markdown(f"**Apply**: [Click here]({job['link']})")
-<<<<<<< HEAD
 
                         if st.button(f"🔍 Recalculate with Full JD for '{job['title']}'", key=f"recalc_{job['title']}"):
                             with st.spinner("Fetching full JD and rescoring..."):
@@ -145,8 +121,6 @@ with tab1:
                                     st.text_area("📊 Updated Feedback", new_feedback, height=300)
                                 else:
                                     st.error("⚠️ Could not fetch full job description.")
-=======
->>>>>>> dcc225fe09ee9c9694aa93b9afa1a5f0a98ddd3e
             else:
                 st.warning("No valid scores returned from LLM.")
 

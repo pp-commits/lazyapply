@@ -87,7 +87,3 @@ Resume:
             })
 
     return results
-<<<<<<< HEAD
-=======
-
->>>>>>> dcc225fe09ee9c9694aa93b9afa1a5f0a98ddd3e
