@@ -24,7 +24,7 @@ if "job_cache" not in st.session_state:
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 st.title("🤖 LazyApply AI — Your Job Buddy!")
 
-tab1, tab2 = st.tabs(["📄 Match Resume", "🧭 Explore Jobs"])
+tab1, tab2 = st.tabs(["📄 Match Resume", "🗭 Explore Jobs"])
 
 # ------------ Phase 1: Resume Matching ------------
 with tab1:
@@ -32,27 +32,33 @@ with tab1:
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
     jd_text = st.text_area("💼 Paste the job description here", height=250)
 
-    if uploaded_file:
-        resume_text = parse_resume(uploaded_file)
-    else:
-        resume_text = None
+    resume_text = parse_resume(uploaded_file) if uploaded_file else None
 
     if resume_text and jd_text:
         if resume_text.strip():
-            progress = st.progress(0)
-            status_placeholder = st.empty()
-            feedback_placeholder = st.empty()
+            input_hash = hash(resume_text + jd_text)
 
-            status_msgs = ["🔍 Analyzing Resume", "📄 Parsing JD", "⚙️ Matching Skills", "🧠 Generating Insights"]
-            for i, msg in enumerate(status_msgs):
-                status_placeholder.markdown(f"**{msg}...**")
-                progress.progress((i + 1) * 20)
-                time.sleep(0.7)
+            if "input_hash" not in st.session_state or st.session_state["input_hash"] != input_hash:
+                progress = st.progress(0)
+                status_placeholder = st.empty()
+                feedback_placeholder = st.empty()
 
-            real_feedback = get_match_feedback(resume_text, jd_text)
-            progress.progress(100)
-            status_placeholder.markdown("✅ Done.")
-            feedback_placeholder.text_area("📊 AI Feedback", real_feedback if isinstance(real_feedback, str) else real_feedback[0], height=300)
+                status_msgs = ["\ud83d\udd0d Analyzing Resume", "\ud83d\udcc4 Parsing JD", "\u2699\ufe0f Matching Skills", "\ud83e\udde0 Generating Insights"]
+                for i, msg in enumerate(status_msgs):
+                    status_placeholder.markdown(f"**{msg}...**")
+                    progress.progress((i + 1) * 20)
+                    time.sleep(0.7)
+
+                real_feedback = get_match_feedback(resume_text, jd_text)
+                progress.progress(100)
+                status_placeholder.markdown("\u2705 Done.")
+
+                st.session_state["input_hash"] = input_hash
+                st.session_state["feedback"] = real_feedback
+            else:
+                real_feedback = st.session_state["feedback"]
+
+            st.text_area("\ud83d\udcca AI Feedback", real_feedback if isinstance(real_feedback, str) else real_feedback[0], height=300)
 
             if st.button("📋 Copy to Clipboard"):
                 st.session_state["copied"] = True
@@ -66,44 +72,50 @@ with tab1:
                 mime="text/plain"
             )
 
-            # ---------- Show Similar Jobs with Scores ----------
+            if "similar_jobs" not in st.session_state or st.session_state.get("input_hash") != input_hash:
+                all_jobs = st.session_state["job_cache"]
+                flat_jobs = []
+                for comp_name, job_list in all_jobs.items():
+                    for job in job_list:
+                        flat_jobs.append({"company": comp_name, **job})
+
+                summaries = [job["summary"] for job in flat_jobs]
+                feedbacks = get_batched_match_feedback(resume_text, summaries)
+
+                scored_jobs = []
+                debug_logs = []
+
+                for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
+                    try:
+                        if not isinstance(feedback, str):
+                            feedback = feedback.get("feedback", "")
+
+                        lines = feedback.splitlines()
+                        match_line = next((line for line in lines if "Match Score:" in line), None)
+
+                        if match_line:
+                            score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
+                            scored_jobs.append({
+                                "company": job["company"],
+                                "title": job["title"],
+                                "location": job["location"],
+                                "score": score_val,
+                                "link": job["link"],
+                                "summary": job["summary"]
+                            })
+                        else:
+                            debug_logs.append(f"Job {idx+1}: Match Score not found in response")
+                    except Exception as e:
+                        debug_logs.append(f"Job {idx+1} Failed: {str(e)}")
+
+                st.session_state["similar_jobs"] = scored_jobs
+                st.session_state["debug_logs"] = debug_logs
+            else:
+                scored_jobs = st.session_state["similar_jobs"]
+                debug_logs = st.session_state.get("debug_logs", [])
+
             st.markdown("---")
             st.subheader("📌 Similar Jobs You May Like")
-
-            all_jobs = st.session_state["job_cache"]
-            flat_jobs = []
-            for comp_name, job_list in all_jobs.items():
-                for job in job_list:
-                    flat_jobs.append({"company": comp_name, **job})
-
-            summaries = [job["summary"] for job in flat_jobs]
-            feedbacks = get_batched_match_feedback(resume_text, summaries)
-
-            scored_jobs = []
-            debug_logs = []
-
-            for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
-                try:
-                    if not isinstance(feedback, str):
-                        feedback = feedback.get("feedback", "")
-
-                    lines = feedback.splitlines()
-                    match_line = next((line for line in lines if "Match Score:" in line), None)
-
-                    if match_line:
-                        score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
-                        scored_jobs.append({
-                            "company": job["company"],
-                            "title": job["title"],
-                            "location": job["location"],
-                            "score": score_val,
-                            "link": job["link"],
-                            "summary": job["summary"]
-                        })
-                    else:
-                        debug_logs.append(f"Job {idx+1}: Match Score not found in response")
-                except Exception as e:
-                    debug_logs.append(f"Job {idx+1} Failed: {str(e)}")
 
             if scored_jobs:
                 sorted_jobs = sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]
