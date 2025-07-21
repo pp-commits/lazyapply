@@ -10,7 +10,7 @@ headers = {
 }
 
 API_URL = "https://api.together.xyz/v1/completions"
-MODEL_NAME = "togethercomputer/llama-2-7b-chat"
+MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 print(f"[DEBUG] Using model: {MODEL_NAME}")
 
 
