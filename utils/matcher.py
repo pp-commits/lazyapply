@@ -10,7 +10,7 @@ headers = {
 }
 
 API_URL = "https://api.together.xyz/v1/completions"
-MODEL_NAME = "togethercomputer/llama-2-7b-chat"
+MODEL_NAME = "meta-llama/Llama-3-8b-chat-hf"
 
 
 def call_together_api(prompt, model=MODEL_NAME):
