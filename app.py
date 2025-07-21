@@ -13,7 +13,7 @@ SUPPORTED_COMPANIES = {
     "Groww": "groww"
 }
 
-# ------------ Phase 2: Explore Jobs Logic FIRST ------------
+# ------------ Cache Greenhouse Jobs Initially ------------
 if "job_cache" not in st.session_state:
     all_jobs = {}
     for comp_name, slug in SUPPORTED_COMPANIES.items():
@@ -34,37 +34,43 @@ with tab1:
 
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
 
-    if resume_text and jd_text:
-        if resume_text.strip():
-            input_hash = hash(resume_text + jd_text)
+    if resume_text and jd_text and resume_text.strip():
+        input_hash = hash(resume_text + jd_text)
 
-            if "input_hash" not in st.session_state or st.session_state["input_hash"] != input_hash:
-                progress = st.progress(0)
-                status_placeholder = st.empty()
-                feedback_placeholder = st.empty()
+        # Trigger AI only if content changed
+        if st.session_state.get("input_hash") != input_hash:
+            progress = st.progress(0)
+            status_placeholder = st.empty()
+            feedback_placeholder = st.empty()
 
-                status_msgs = ["\ud83d\udd0d Analyzing Resume", "\ud83d\udcc4 Parsing JD", "\u2699\ufe0f Matching Skills", "\ud83e\udde0 Generating Insights"]
-                for i, msg in enumerate(status_msgs):
-                    status_placeholder.markdown(f"**{msg}...**")
-                    progress.progress((i + 1) * 20)
-                    time.sleep(0.7)
+            status_msgs = ["🔍 Analyzing Resume", "📄 Parsing JD", "⚙️ Matching Skills", "🧠 Generating Insights"]
+            for i, msg in enumerate(status_msgs):
+                status_placeholder.markdown(f"**{msg}...**")
+                progress.progress((i + 1) * 20)
+                time.sleep(0.7)
 
-                real_feedback = get_match_feedback(resume_text, jd_text)
-                progress.progress(100)
-                status_placeholder.markdown("\u2705 Done.")
+            real_feedback = get_match_feedback(resume_text, jd_text)
 
-                st.session_state["input_hash"] = input_hash
-                st.session_state["feedback"] = real_feedback
-            else:
-                real_feedback = st.session_state["feedback"]
+            progress.progress(100)
+            status_placeholder.markdown("✅ Done.")
 
-            st.text_area("\ud83d\udcca AI Feedback", real_feedback if isinstance(real_feedback, str) else real_feedback[0], height=300)
+            st.session_state["input_hash"] = input_hash
+            st.session_state["feedback"] = real_feedback
+            st.session_state["copied"] = False
+        else:
+            real_feedback = st.session_state["feedback"]
 
+        st.text_area("📊 AI Feedback", real_feedback if isinstance(real_feedback, str) else real_feedback[0], height=300)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
             if st.button("📋 Copy to Clipboard"):
                 st.session_state["copied"] = True
             if st.session_state.get("copied"):
                 st.success("Copied!")
 
+        with col2:
             st.download_button(
                 label="⬇️ Download Report",
                 data=real_feedback[0].encode("utf-8") if isinstance(real_feedback, tuple) else real_feedback.encode("utf-8"),
@@ -72,80 +78,74 @@ with tab1:
                 mime="text/plain"
             )
 
-            if "similar_jobs" not in st.session_state or st.session_state.get("input_hash") != input_hash:
-                all_jobs = st.session_state["job_cache"]
-                flat_jobs = []
-                for comp_name, job_list in all_jobs.items():
-                    for job in job_list:
-                        flat_jobs.append({"company": comp_name, **job})
+        # Batch match with cached jobs
+        if "similar_jobs" not in st.session_state or st.session_state["input_hash"] != input_hash:
+            all_jobs = st.session_state["job_cache"]
+            flat_jobs = [{"company": comp, **job} for comp, jobs in all_jobs.items() for job in jobs]
+            summaries = [job["summary"] for job in flat_jobs]
+            feedbacks = get_batched_match_feedback(resume_text, summaries)
 
-                summaries = [job["summary"] for job in flat_jobs]
-                feedbacks = get_batched_match_feedback(resume_text, summaries)
+            scored_jobs = []
+            debug_logs = []
 
-                scored_jobs = []
-                debug_logs = []
+            for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
+                try:
+                    lines = feedback.splitlines() if isinstance(feedback, str) else []
+                    match_line = next((line for line in lines if "Match Score:" in line), None)
+                    if match_line:
+                        score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
+                        scored_jobs.append({
+                            "company": job["company"],
+                            "title": job["title"],
+                            "location": job["location"],
+                            "score": score_val,
+                            "link": job["link"],
+                            "summary": job["summary"]
+                        })
+                    else:
+                        debug_logs.append(f"Job {idx+1}: Match Score not found.")
+                except Exception as e:
+                    debug_logs.append(f"Job {idx+1} Error: {str(e)}")
 
-                for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
-                    try:
-                        if not isinstance(feedback, str):
-                            feedback = feedback.get("feedback", "")
-
-                        lines = feedback.splitlines()
-                        match_line = next((line for line in lines if "Match Score:" in line), None)
-
-                        if match_line:
-                            score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
-                            scored_jobs.append({
-                                "company": job["company"],
-                                "title": job["title"],
-                                "location": job["location"],
-                                "score": score_val,
-                                "link": job["link"],
-                                "summary": job["summary"]
-                            })
-                        else:
-                            debug_logs.append(f"Job {idx+1}: Match Score not found in response")
-                    except Exception as e:
-                        debug_logs.append(f"Job {idx+1} Failed: {str(e)}")
-
-                st.session_state["similar_jobs"] = scored_jobs
-                st.session_state["debug_logs"] = debug_logs
-            else:
-                scored_jobs = st.session_state["similar_jobs"]
-                debug_logs = st.session_state.get("debug_logs", [])
-
-            st.markdown("---")
-            st.subheader("📌 Similar Jobs You May Like")
-
-            if scored_jobs:
-                sorted_jobs = sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]
-                for job in sorted_jobs:
-                    with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
-                        st.markdown(f"**Location**: {job['location']}")
-                        st.markdown(f"**Apply**: [Click here]({job['link']})")
-
-                        if st.button(f"🔍 Recalculate with Full JD for '{job['title']}'", key=f"recalc_{job['title']}"):
-                            with st.spinner("Fetching full JD and rescoring..."):
-                                full_jd = fetch_full_job_description(job["link"])
-                                if full_jd:
-                                    new_feedback, new_score = get_match_feedback(resume_text, full_jd)
-                                    st.success(f"✅ Updated Match Score: {new_score}/100")
-                                    st.text_area("📊 Updated Feedback", new_feedback, height=300)
-                                else:
-                                    st.error("⚠️ Could not fetch full job description.")
-            else:
-                st.warning("No valid scores returned from LLM.")
-
-            if debug_logs:
-                st.markdown("**Debug Info:**")
-                for log in debug_logs:
-                    st.markdown(f"- {log}")
+            st.session_state["similar_jobs"] = scored_jobs
+            st.session_state["debug_logs"] = debug_logs
         else:
-            st.warning("Resume text could not be extracted.")
+            scored_jobs = st.session_state["similar_jobs"]
+            debug_logs = st.session_state.get("debug_logs", [])
+
+        st.markdown("---")
+        st.subheader("📌 Similar Jobs You May Like")
+
+        if scored_jobs:
+            sorted_jobs = sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]
+            for job in sorted_jobs:
+                with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
+                    st.markdown(f"**Location**: {job['location']}")
+                    st.markdown(f"**Apply**: [Click here]({job['link']})")
+
+                    if st.button(f"🔍 Recalculate with Full JD for '{job['title']}'", key=f"recalc_{job['title']}"):
+                        with st.spinner("Fetching full JD and rescoring..."):
+                            full_jd = fetch_full_job_description(job["link"])
+                            if full_jd:
+                                new_feedback, new_score = get_match_feedback(resume_text, full_jd)
+                                st.success(f"✅ Updated Match Score: {new_score}/100")
+                                st.text_area("📊 Updated Feedback", new_feedback, height=300)
+                            else:
+                                st.error("⚠️ Could not fetch full job description.")
+        else:
+            st.warning("No valid scores returned from LLM.")
+
+        if debug_logs:
+            st.markdown("**Debug Info:**")
+            for log in debug_logs:
+                st.markdown(f"- {log}")
+
     elif not uploaded_file:
         st.info("Please upload a resume.")
-    else:
+    elif not jd_text:
         st.info("Please paste a job description.")
+    else:
+        st.warning("Resume text could not be extracted.")
 
 # ------------ Phase 2: Explore Jobs ------------
 with tab2:
