@@ -135,7 +135,7 @@ with tab1:
                                 updated = get_match_feedback(resume_text, full_jd)
                                 if isinstance(updated, tuple):
                                     new_feedback, new_score = updated
-                                    st.success(f"✅ Updated Match Score: {new_score}/100")
+                                    #st.success(f"✅ Updated Match Score: {new_score}/100")
                                     st.text_area("📊 Updated Feedback", new_feedback, height=300)
                                 else:
                                     st.text_area("📊 Updated Feedback", updated, height=300)
@@ -145,10 +145,10 @@ with tab1:
         else:
             st.warning("No valid scores returned from LLM.")
 
-        if debug_logs:
-            st.markdown("**Debug Info:**")
-            for log in debug_logs:
-                st.markdown(f"- {log}")
+        #if debug_logs:
+            #st.markdown("**Debug Info:**")
+            #for log in debug_logs:
+                #st.markdown(f"- {log}")
 
     elif not uploaded_file:
         st.info("Please upload a resume.")
