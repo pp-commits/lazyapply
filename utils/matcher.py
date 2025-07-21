@@ -9,12 +9,15 @@ headers = {
     "Content-Type": "application/json"
 }
 
-# ✅ Updated to chat completions endpoint
+# 🔧 Model configuration
+MAIN_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"  # For detailed matching
+LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"           # For similar jobs
 API_URL = "https://api.together.xyz/v1/chat/completions"
-MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
-print(f"[DEBUG] Using model: {MODEL_NAME}")
 
-def call_together_api(prompt, model=MODEL_NAME):
+print(f"[DEBUG] Primary model: {MAIN_MODEL}")
+print(f"[DEBUG] Lightweight model: {LIGHT_MODEL}")
+
+def call_together_api(prompt, model=MAIN_MODEL):
     payload = {
         "model": model,
         "messages": [
@@ -66,7 +69,7 @@ def get_batched_match_feedback(resume_text, jd_list):
     for jd_text in jd_list:
         prompt = f"""
 Compare the following resume with the job summary.
-Return a brief feedback and a Match Score (out of 100).
+Return a brief reasoning and a match score out of 100.
 
 Resume:
 {resume_text}
@@ -74,6 +77,7 @@ Resume:
 Job Summary:
 {jd_text}
 """
-        result = call_together_api(prompt)
+        # Use lightweight model for batch
+        result = call_together_api(prompt, model=LIGHT_MODEL)
         results.append(result)
     return results
