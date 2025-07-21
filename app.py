@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import time
+import re
 from utils.resume_parser import parse_resume
 from utils.matcher import get_match_feedback, get_batched_match_feedback
 from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
@@ -24,7 +25,7 @@ if "job_cache" not in st.session_state:
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 st.title("🤖 LazyApply AI — Your Job Buddy!")
 
-tab1, tab2 = st.tabs(["📄 Match Resume", "🗭 Explore Jobs"])
+tab1, tab2 = st.tabs(["📄 Match Resume", "🴭 Explore Jobs"])
 
 # ------------ Phase 1: Resume Matching ------------
 with tab1:
@@ -90,10 +91,9 @@ with tab1:
 
             for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
                 try:
-                    lines = feedback.splitlines() if isinstance(feedback, str) else []
-                    match_line = next((line for line in lines if "Match Score:" in line), None)
-                    if match_line:
-                        score_val = int(match_line.split(":")[1].split("/")[0].strip("* "))
+                    match = re.search(r'(\d{1,3})\s*(?:/|out of)\s*100', feedback, re.IGNORECASE)
+                    if match:
+                        score_val = int(match.group(1))
                         scored_jobs.append({
                             "company": job["company"],
                             "title": job["title"],
@@ -127,9 +127,14 @@ with tab1:
                         with st.spinner("Fetching full JD and rescoring..."):
                             full_jd = fetch_full_job_description(job["link"])
                             if full_jd:
-                                new_feedback, new_score = get_match_feedback(resume_text, full_jd)
-                                st.success(f"✅ Updated Match Score: {new_score}/100")
-                                st.text_area("📊 Updated Feedback", new_feedback, height=300)
+                                updated = get_match_feedback(resume_text, full_jd)
+                                if isinstance(updated, tuple):
+                                    new_feedback, new_score = updated
+                                    st.success(f"✅ Updated Match Score: {new_score}/100")
+                                    st.text_area("📊 Updated Feedback", new_feedback, height=300)
+                                else:
+                                    st.text_area("📊 Updated Feedback", updated, height=300)
+                                    st.warning("Could not extract score from LLM output.")
                             else:
                                 st.error("⚠️ Could not fetch full job description.")
         else:

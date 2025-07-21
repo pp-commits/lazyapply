@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
-import re  # 🆕 Import regex for better score extraction
+import re  # For extracting scores
 
-# 🔐 Load Together API key from Streamlit secrets
+# 🔐 Load API key securely
 TOGETHER_API_KEY = st.secrets["together"]["api_key"]
 
 headers = {
@@ -10,15 +10,15 @@ headers = {
     "Content-Type": "application/json"
 }
 
-# 🔧 Model configuration
-MAIN_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"  # For detailed matching
-LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"           # For similar jobs
+# 🧠 Models
+MAIN_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"  # Deep analysis
+LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"           # Fast summaries
 API_URL = "https://api.together.xyz/v1/chat/completions"
 
 print(f"[DEBUG] Primary model: {MAIN_MODEL}")
 print(f"[DEBUG] Lightweight model: {LIGHT_MODEL}")
 
-def call_together_api(prompt, model=MAIN_MODEL):
+def call_together_api(prompt, model=MAIN_MODEL, temperature=0.7):
     payload = {
         "model": model,
         "messages": [
@@ -26,7 +26,7 @@ def call_together_api(prompt, model=MAIN_MODEL):
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 512,
-        "temperature": 0.7
+        "temperature": temperature
     }
 
     response = requests.post(API_URL, headers=headers, json=payload)
@@ -34,11 +34,13 @@ def call_together_api(prompt, model=MAIN_MODEL):
     if response.status_code == 200:
         return response.json()["choices"][0]["message"]["content"].strip()
     else:
-        st.error(f"API Error {response.status_code}: {response.text}")
-        return "⚠️ API call failed."
+        st.error(f"[API Error {response.status_code}]: {response.text}")
+        return None
 
 def extract_score(text):
-    """ Extracts a score (0–100) from LLM output using regex. """
+    """Extracts a score (0–100) from model output."""
+    if not text:
+        return None
     match = re.search(r"\b(\d{2,3})\s*out\s*of\s*100\b", text, re.IGNORECASE)
     if match:
         try:
@@ -46,10 +48,14 @@ def extract_score(text):
             if 0 <= score <= 100:
                 return score
         except ValueError:
-            pass
+            return None
     return None
 
 def get_match_feedback(resume_text, jd_text):
+    """
+    Full feedback with detailed prompt (used after user clicks 'Recalculate with full JD').
+    Returns (feedback, score) or (feedback, None) on failure.
+    """
     prompt = f"""
 You are a resume evaluator AI.
 Compare the following resume with the job description and return:
@@ -65,12 +71,20 @@ Job Description:
 {jd_text}
 """
     result = call_together_api(prompt)
-    score = extract_score(result)
-    return (result, score) if score is not None else result
+    if result:
+        score = extract_score(result)
+        return result, score
+    else:
+        return "⚠️ API error or no result.", None
 
 def get_batched_match_feedback(resume_text, jd_list):
+    """
+    Fast batch feedback using lighter model and job summaries.
+    Each item returns a tuple: (feedback, score)
+    """
     results = []
-    for jd_text in jd_list:
+
+    for i, jd_text in enumerate(jd_list):
         prompt = f"""
 Compare the following resume with the job summary.
 Return a brief reasoning and a match score out of 100.
@@ -82,6 +96,10 @@ Job Summary:
 {jd_text}
 """
         result = call_together_api(prompt, model=LIGHT_MODEL)
-        score = extract_score(result)
-        results.append((result, score) if score is not None else result)
+        if result:
+            score = extract_score(result)
+            results.append((result, score))
+        else:
+            results.append(("⚠️ API error or no result.", None))
+
     return results
