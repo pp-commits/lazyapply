@@ -1,89 +1,55 @@
-import ollama
-import re
+import streamlit as st
+import requests
 
-def get_match_feedback(resume_text, jd_text):
-    prompt = f"""
-You are a top-tier resume and job-match analyst.
+# 🔐 Securely load API key from Streamlit secrets
+TOGETHER_API_KEY = st.secrets["TOGETHER_API_KEY"]
 
+# Define headers using the secret key
+headers = {
+    "Authorization": f"Bearer {TOGETHER_API_KEY}",
+    "Content-Type": "application/json"
+}
+
+# Sample function to call Together.ai for inference
+def get_model_response(prompt, model="togethercomputer/llama-2-7b-chat"):
+    api_url = "https://api.together.xyz/v1/completions"
+    
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "max_tokens": 512,
+        "temperature": 0.7
+    }
+
+    response = requests.post(api_url, headers=headers, json=payload)
+
+    if response.status_code == 200:
+        return response.json().get("choices")[0].get("text", "").strip()
+    else:
+        st.error(f"API Error {response.status_code}: {response.text}")
+        return None
+
+# Example Streamlit UI
+def main():
+    st.title("🧠 JobFit AI - Resume + JD Matcher")
+
+    resume_text = st.text_area("Paste your resume here:", height=200)
+    jd_text = st.text_area("Paste the job description here:", height=200)
+
+    if st.button("Analyze Fit"):
+        with st.spinner("Analyzing..."):
+            prompt = f"""You are an AI assistant that evaluates resume and job description match.
+Return a score (out of 100) and highlight matching and missing skills.
 Resume:
 {resume_text}
 
 Job Description:
 {jd_text}
-
-Give output strictly in this format:
-Match Score: <score>/100
-
-Top 3 Gaps or Mismatches:
-1. ...
-2. ...
-3. ...
-
-Suggested Resume Bullet Points:
-- ...
-- ...
-
-ATS Optimization Tip (Optional):
-...
 """
-    response = ollama.chat(
-        model="llama3",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    content = response['message']['content']
-    match = re.search(r"Match Score:\s*\**\s*(\d{1,3})", content)
-    score = int(match.group(1)) if match else 0
-    return content, score
+            result = get_model_response(prompt)
+            if result:
+                st.success("Result:")
+                st.markdown(result)
 
-def get_batched_match_feedback(resume_text, jobs):
-    import ollama
-    import re
-
-    prompt = f"""
-You are a resume-job match scoring system. A resume is provided below. Then you will get multiple job summaries.
-
-For each job summary, return a line in the following format:
-Job <number> Match Score: <score>/100
-
-Only output these lines.
-
-Resume:
-{resume_text}
-
-"""
-
-    for idx, summary in enumerate(jobs, start=1):
-        prompt += f"Job {idx} Summary:\n{summary}\n\n"
-
-    response = ollama.chat(
-        model='llama3',
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    content = response['message']['content']
-    lines = content.strip().splitlines()
-
-    results = []
-    for i, line in enumerate(lines):
-        try:
-            match = re.search(r"Job\s*(\d+)\s*Match Score:\s*(\d{1,3})\/100", line)
-            if match:
-                results.append({
-                    "job_index": int(match.group(1)) - 1,  # index for matching job later
-                    "score": int(match.group(2)),
-                    "feedback": line
-                })
-            else:
-                results.append({
-                    "job_index": i,
-                    "score": 0,
-                    "feedback": f"Job {i+1} Match Score: 0/100 (couldn't parse)"
-                })
-        except Exception as e:
-            results.append({
-                "job_index": i,
-                "score": 0,
-                "feedback": f"Job {i+1} Failed: {str(e)}"
-            })
-
-    return results
+if __name__ == "__main__":
+    main()
