@@ -91,7 +91,12 @@ with tab1:
 
             for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
                 try:
-                    match = re.search(r'(\d{1,3})\s*(?:/|out of)\s*100', feedback, re.IGNORECASE)
+                    if isinstance(feedback, tuple):
+                        feedback_text = feedback[0]
+                    else:
+                        feedback_text = feedback
+
+                    match = re.search(r'(\d{1,3})\s*(?:/|out of)\s*100', feedback_text, re.IGNORECASE)
                     if match:
                         score_val = int(match.group(1))
                         scored_jobs.append({
