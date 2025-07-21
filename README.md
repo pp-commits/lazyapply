@@ -1,44 +1,51 @@
-# 🥷 LazyApply AI — Outsmart Job Portals Like a Ninja
+# 🤖 LazyApply AI — Outsmart the Resume Game
 
-LazyApply AI is your silent career sidekick — a sleek, no-frills agent that **analyzes your resume**, **reads job descriptions**, and gives you laser-sharp feedback on how well you match... all **without OpenAI API fees**.
+A ninja-grade tool to *slice through job descriptions* and give you AI-powered match feedback on your resume.
 
-No more guessing. Just upload your resume, paste a JD, and get:
-- ✅ A Match Score (out of 100)
-- 🧠 Top 3 Missing Skills
-- 🧾 Bullet Points to Add
-- 💾 Downloadable Reports
-- 📋 Copyable Results
-
----
-
-### ⚙️ Tech Stack
-
-| Part | Stack |
-|------|-------|
-| 🖥️ Frontend | Streamlit |
-| 📄 Resume Parsing | `pdfplumber`, `python-docx` |
-| 🧠 LLM Engine | [LLaMA 3 via Ollama](https://ollama.com) |
-| 🔐 Env Management | `python-dotenv` |
-| 📦 Extras | `ollama`, `streamlit` |
+### ✨ What It Does
+LazyApply helps job seekers instantly:
+- 📄 Upload a resume (PDF or DOCX)
+- 🧠 Paste or auto-fetch job descriptions
+- 📊 Get AI-based match scores out of 100
+- 🧩 See missing skills and how to improve
+- ⬇️ Download or 📋 copy feedback
+- 🔍 Explore real-time jobs from top tech companies (Razorpay, Freshworks, etc.)
 
 ---
 
-### 🧪 How It Works
-
-1. Upload your resume (`.pdf` or `.docx`)
-2. Paste any job description
-3. AI compares, scores, and suggests bullet points
-4. You copy/download and apply like a boss
+### 💡 Why I Built It
+Tired of blindly applying to jobs and not hearing back?  
+LazyApply is a response to that — a resume/job description matcher powered by LLMs (like Mistral & LLaMA3), built to help *you* tailor your resume better, faster, smarter.
 
 ---
 
-### 🚀 Run It Locally
+### 🛠️ Tech Stack
 
-> No API key needed. All AI runs **locally** on your machine!
+| Feature                | Stack Used                         |
+|------------------------|-------------------------------------|
+| Frontend               | Streamlit                          |
+| Resume Parsing         | `pdfminer`, `docx2txt`              |
+| LLM Integration        | `Ollama` (local Mistral/LLaMA3)     |
+| Job Scraping           | `Playwright`, `requests`, `BeautifulSoup` |
+| Match Logic            | Custom prompts + regex scoring     |
+| Deployment             | Streamlit Community Cloud          |
 
-#### 🧰 Setup
+---
+
+### ⚠️ Challenges & Fixes
+
+- **LLM Flakiness** → Switched models, added fallback logic
+- **Score Parsing Fails** → Regex + tuple handling fixed
+- **Job Boards Blocked** → Used Greenhouse APIs for job fetching
+- **Deployment Woes** → Deployed on Streamlit Cloud with secret keys
+
+---
+
+### 📦 Local Setup
 
 ```bash
 git clone https://github.com/pp-commits/lazyapply.git
 cd lazyapply
 pip install -r requirements.txt
+ollama run mistral  # or llama3 if your system supports it
+streamlit run app.py
