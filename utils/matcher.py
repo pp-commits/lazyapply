@@ -11,7 +11,7 @@ headers = {
 }
 
 # 🧠 Models
-MAIN_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"  # Deep analysis
+MAIN_MODEL = "lgai/exaone-3-5-32b-instruct"  # Deep analysis
 LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"           # Fast summaries
 API_URL = "https://api.together.xyz/v1/chat/completions"
 
