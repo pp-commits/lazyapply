@@ -11,6 +11,8 @@ headers = {
 
 API_URL = "https://api.together.xyz/v1/completions"
 MODEL_NAME = "meta-llama/Llama-3-8b-chat-hf"
+print(f"[DEBUG] Using model: {MODEL_NAME}")
+
 
 
 def call_together_api(prompt, model=MODEL_NAME):
