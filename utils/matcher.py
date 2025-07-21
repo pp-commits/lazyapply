@@ -9,16 +9,18 @@ headers = {
     "Content-Type": "application/json"
 }
 
-API_URL = "https://api.together.xyz/v1/completions"
+# ✅ Updated to chat completions endpoint
+API_URL = "https://api.together.xyz/v1/chat/completions"
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 print(f"[DEBUG] Using model: {MODEL_NAME}")
-
-
 
 def call_together_api(prompt, model=MODEL_NAME):
     payload = {
         "model": model,
-        "prompt": prompt,
+        "messages": [
+            {"role": "system", "content": "You are a helpful resume evaluator AI assistant."},
+            {"role": "user", "content": prompt}
+        ],
         "max_tokens": 512,
         "temperature": 0.7
     }
@@ -26,11 +28,10 @@ def call_together_api(prompt, model=MODEL_NAME):
     response = requests.post(API_URL, headers=headers, json=payload)
 
     if response.status_code == 200:
-        return response.json()["choices"][0]["text"].strip()
+        return response.json()["choices"][0]["message"]["content"].strip()
     else:
         st.error(f"API Error {response.status_code}: {response.text}")
         return "⚠️ API call failed."
-
 
 def get_match_feedback(resume_text, jd_text):
     prompt = f"""
@@ -59,7 +60,6 @@ Job Description:
                 pass
 
     return (result, score) if score else result
-
 
 def get_batched_match_feedback(resume_text, jd_list):
     results = []
