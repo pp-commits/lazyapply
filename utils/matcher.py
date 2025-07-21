@@ -40,7 +40,7 @@ def main():
         with st.spinner("Analyzing..."):
             prompt = f"""You are an AI assistant that evaluates resume and job description match.
 Return a score (out of 100) and highlight matching and missing skills.
-Resume:
+Resume: 
 {resume_text}
 
 Job Description:
