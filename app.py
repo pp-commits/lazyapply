@@ -176,7 +176,7 @@ with tab2:
                     st.markdown(f"**Company**: {selected_company}")
                     st.markdown(f"**Location**: {job['location']}")
                     st.markdown(f"**Link**: [Apply Here]({job['link']})")
-                    st.markdown(f"**Summary**:\n\n{job['summary']}")
+                    #st.markdown(f"**Summary**:\n\n{job['summary']}")
 
                     if uploaded_file:
                         unique_key = f"{job['title']}_{job['link'].split('/')[-1]}"
