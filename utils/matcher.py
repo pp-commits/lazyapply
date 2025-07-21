@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import re  # 🆕 Import regex for better score extraction
 
 # 🔐 Load Together API key from Streamlit secrets
 TOGETHER_API_KEY = st.secrets["together"]["api_key"]
@@ -36,6 +37,18 @@ def call_together_api(prompt, model=MAIN_MODEL):
         st.error(f"API Error {response.status_code}: {response.text}")
         return "⚠️ API call failed."
 
+def extract_score(text):
+    """ Extracts a score (0–100) from LLM output using regex. """
+    match = re.search(r"\b(\d{2,3})\s*out\s*of\s*100\b", text, re.IGNORECASE)
+    if match:
+        try:
+            score = int(match.group(1))
+            if 0 <= score <= 100:
+                return score
+        except ValueError:
+            pass
+    return None
+
 def get_match_feedback(resume_text, jd_text):
     prompt = f"""
 You are a resume evaluator AI.
@@ -52,17 +65,8 @@ Job Description:
 {jd_text}
 """
     result = call_together_api(prompt)
-
-    # Try to extract score
-    score = None
-    for line in result.splitlines():
-        if "Match Score" in line:
-            try:
-                score = int(line.split(":")[1].split("/")[0].strip("* "))
-            except:
-                pass
-
-    return (result, score) if score else result
+    score = extract_score(result)
+    return (result, score) if score is not None else result
 
 def get_batched_match_feedback(resume_text, jd_list):
     results = []
@@ -77,7 +81,7 @@ Resume:
 Job Summary:
 {jd_text}
 """
-        # Use lightweight model for batch
         result = call_together_api(prompt, model=LIGHT_MODEL)
-        results.append(result)
+        score = extract_score(result)
+        results.append((result, score) if score is not None else result)
     return results
