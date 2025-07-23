@@ -58,8 +58,8 @@ with tab1:
         "Tailor Resume for Job Description",
         "Top 1% Candidate Benchmarking",
         "Generate Cover Letter",
-        "Suggest Resume Format,"
-        "Full Resume Intelligence Report",
+        "Suggest Resume Format",
+        "Full Resume Intelligence Report"
     ])
 
     section = st.selectbox("🔹 Focus on a specific resume section?", [
