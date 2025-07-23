@@ -73,8 +73,9 @@ with tab1:
     chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
 
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
+    submitted = st.button("🚀 Generate Feedback")
 
-    if resume_text and resume_text.strip():
+    if submitted and resume_text and resume_text.strip() and jd_text.strip():
         key_hash = hash(resume_text + jd_text + mode + section + chosen_model)
 
         if st.session_state.get("input_hash") != key_hash:
@@ -93,13 +94,12 @@ with tab1:
                 st.session_state["feedback"] = str(result)
                 st.session_state["copied"] = False
 
-                save_match(resume_text, jd_text, result)  # ✅ Save to history
+                save_match(resume_text, jd_text, result)
         else:
             result = st.session_state["feedback"]
 
         result = str(result) if result else "⚠️ No result generated."
         st.text_area("📊 AI Feedback", result, height=300)
-
 
         col1, col2 = st.columns(2)
         with col1:
@@ -116,7 +116,7 @@ with tab1:
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-        with st.expander("\ud83d\udcdc View My Feedback History"):
+        with st.expander("📄 View My Feedback History"):
             history = get_history()
             if not history:
                 st.info("No past matches found.")
@@ -159,14 +159,17 @@ with tab1:
                                 full_jd = fetch_full_job_description(job["link"])
                                 if full_jd:
                                     updated = get_match_feedback(resume_text, full_jd)
-                                    if isinstance(updated, tuple):
-                                        st.text_area("\ud83d\udcca Updated Feedback", updated[0], height=300)
-                                    else:
-                                        st.text_area("\ud83d\udcca Updated Feedback", updated, height=300)
+                                    updated_str = str(updated[0]) if isinstance(updated, tuple) else str(updated)
+                                    st.text_area("📊 Updated Feedback", updated_str, height=300)
                                 else:
                                     st.error("Could not fetch full job description.")
-    else:
-        st.info("Upload your resume to begin.")
+    elif submitted:
+        if not uploaded_file and not jd_text.strip():
+            st.info("Upload your resume and paste a job description to begin.")
+        elif not uploaded_file:
+            st.warning("Please upload your resume.")
+        elif not jd_text.strip():
+            st.warning("Please paste a job description.")
 
 # ------------ Phase 2: Explore Jobs ------------
 with tab2:
