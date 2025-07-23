@@ -48,13 +48,13 @@ st.markdown("""
 
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
-        background-color: #f9fbff;
-        color: #222;
+        background-color: var(--background-color);
+        color: var(--text-color);
     }
 
     h1, h2, h3 {
         font-weight: 600;
-        color: #2e2e2e;
+        color: var(--text-color);
     }
 
     .stButton button {
@@ -84,8 +84,10 @@ st.markdown("""
         background: #000;
     }
 
-    .stTextInput>div>div>input, .stTextArea textarea {
-        background-color: #ffffff;
+    .stTextInput>div>div>input,
+    .stTextArea textarea {
+        background-color: var(--background-color);
+        color: var(--text-color);
         border-radius: 10px;
         border: 1px solid #dce6f7;
         padding: 10px;
@@ -96,11 +98,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-st.markdown("""
-    <h1 style='text-align: center; color: #4B4B4B; font-family: "Poppins", sans-serif;'>
-    🤖 LazyApply AI <span style='font-size:0.8em; color: #888;'>Your Job Buddy</span>
-    </h1>
-""", unsafe_allow_html=True)
+
 
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
