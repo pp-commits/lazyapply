@@ -50,6 +50,7 @@ with tab1:
     jd_text = st.text_area("💼 Paste the job description here", height=250)
 
     mode = st.selectbox("🧠 Choose AI Analysis Mode", [
+        "🧠 Full Resume Intelligence Report",
         "Brutal Resume Review",
         "Rewrite to Sound Results-Driven",
         "Optimize for ATS",

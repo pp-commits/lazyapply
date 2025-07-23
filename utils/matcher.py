@@ -1,9 +1,7 @@
 import streamlit as st
 import requests
-import re  # For extracting scores
-from utils.prompt_templates import build_prompt  # ✅ New import
+import re
 
-# 🔐 Load API key securely
 TOGETHER_API_KEY = st.secrets["together"]["api_key"]
 
 headers = {
@@ -11,13 +9,9 @@ headers = {
     "Content-Type": "application/json"
 }
 
-# 🧠 Models
-MAIN_MODEL = "lgai/exaone-3-5-32b-instruct"  # Deep analysis
-LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"  # Fast summaries
+MAIN_MODEL = "lgai/exaone-3-5-32b-instruct"
+LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 API_URL = "https://api.together.xyz/v1/chat/completions"
-
-print(f"[DEBUG] Primary model: {MAIN_MODEL}")
-print(f"[DEBUG] Lightweight model: {LIGHT_MODEL}")
 
 def call_together_api(prompt, model=MAIN_MODEL, temperature=0.7):
     payload = {
@@ -26,7 +20,7 @@ def call_together_api(prompt, model=MAIN_MODEL, temperature=0.7):
             {"role": "system", "content": "You are a helpful resume evaluator AI assistant."},
             {"role": "user", "content": prompt}
         ],
-        "max_tokens": 512,
+        "max_tokens": 2048,
         "temperature": temperature
     }
 
@@ -39,7 +33,6 @@ def call_together_api(prompt, model=MAIN_MODEL, temperature=0.7):
         return None
 
 def extract_score(text):
-    """Extracts a score (0–100) from model output."""
     if not text:
         return None
     match = re.search(r"\b(\d{2,3})\s*out\s*of\s*100\b", text, re.IGNORECASE)
@@ -53,10 +46,6 @@ def extract_score(text):
     return None
 
 def get_match_feedback(resume_text, jd_text):
-    """
-    Full feedback with detailed prompt (used after user clicks 'Recalculate with full JD').
-    Returns (feedback, score) or (feedback, None) on failure.
-    """
     prompt = f"""
 You are a resume evaluator AI.
 Compare the following resume with the job description and return:
@@ -79,13 +68,8 @@ Job Description:
         return "⚠️ API error or no result.", None
 
 def get_batched_match_feedback(resume_text, jd_list):
-    """
-    Fast batch feedback using lighter model and job summaries.
-    Each item returns a tuple: (feedback, score)
-    """
     results = []
-
-    for i, jd_text in enumerate(jd_list):
+    for jd_text in jd_list:
         prompt = f"""
 Compare the following resume with the job summary.
 Return a brief reasoning and a match score out of 100.
@@ -102,20 +86,18 @@ Job Summary:
             results.append((result, score))
         else:
             results.append(("⚠️ API error or no result.", None))
-
     return results
 
-# ✅ New: Modular prompt handler
-def get_custom_prompt_feedback(resume_text, jd_text=None, mode="Brutal Resume Review", section="Entire Resume", model=MAIN_MODEL):
-    """
-    Flexible prompt-based feedback engine.
-    Supports modes like ATS, rewriting, summary, tailoring, etc.
-    """
-    prompt = build_prompt(resume_text, jd_text, mode=mode, section=section)
+def get_custom_prompt_feedback(resume_text, jd_text, mode, section, model=MAIN_MODEL):
+    from utils.prompt_templates import build_prompt
+    prompt = build_prompt(resume_text, jd_text, mode)
     result = call_together_api(prompt, model=model)
+    score = extract_score(result)
+    return result, score
 
-    if result:
-        score = extract_score(result)
-        return result, score
-    else:
-        return "⚠️ API error or no result.", None
+def get_full_resume_analysis(resume_text, jd_text):
+    from utils.prompt_templates import build_prompt
+    prompt = build_prompt(resume_text, jd_text, mode="Full Resume Intelligence Report")
+    result = call_together_api(prompt, model=MAIN_MODEL)
+    score = extract_score(result)
+    return result, score
