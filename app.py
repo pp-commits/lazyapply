@@ -2,8 +2,6 @@ import streamlit as st
 import requests
 import time
 import re
-import plotly.graph_objects as go
-import pandas as pd
 from io import BytesIO
 from docx import Document
 
@@ -113,7 +111,7 @@ with tab1:
     jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
 
     mode = st.selectbox("🧠 Choose AI Analysis Mode", [
-        "🧠 Full Resume Intelligence Report",
+        
         "Brutal Resume Review",
         "Rewrite to Sound Results-Driven",
         "Optimize for ATS",
@@ -121,7 +119,8 @@ with tab1:
         "Tailor Resume for Job Description",
         "Top 1% Candidate Benchmarking",
         "Generate Cover Letter",
-        "Suggest Resume Format"
+        "Suggest Resume Format",
+       "Full Resume Intelligence Report"
     ])
 
     section = st.selectbox("🔹 Focus on a specific resume section?", [
@@ -164,47 +163,6 @@ with tab1:
 
         result = str(result) if result else "⚠️ No result generated."
         st.text_area("📊 AI Feedback", result, height=300)
-
-        match_score = extract_score(result)
-        global_score_match = re.search(r"Global Score\s*[:\-]\s*(\d{1,3})", result, re.IGNORECASE)
-        global_percentile_match = re.search(r"Percentile Rank\s*[:\-]\s*Top\s*(\d{1,3})", result, re.IGNORECASE)
-
-        global_score = int(global_score_match.group(1)) if global_score_match else None
-        percentile = int(global_percentile_match.group(1)) if global_percentile_match else None
-
-        if match_score or global_score:
-            st.markdown("### 📊 Resume Evaluation Metrics")
-            st.table({
-                "Metric": ["Match Score", "Global Resume Score", "Percentile Rank"],
-                "Value": [
-                    f"{match_score}/100" if match_score else "N/A",
-                    f"{global_score}/100" if global_score else "N/A",
-                    f"Top {percentile}%" if percentile else "N/A"
-                ]
-            })
-
-            fig = go.Figure(data=go.Heatmap(
-                z=[[match_score, global_score, 90]],
-                x=["Match Score", "Global Score", "ATS Score (est.)"],
-                y=["Resume"],
-                colorscale="RdYlGn",
-                zmin=0,
-                zmax=100,
-                showscale=True
-            ))
-            st.plotly_chart(fig, use_container_width=True)
-
-        st.markdown("### 📈 Resume Score Progress Over Time")
-        history = get_history()
-        if history:
-            df = pd.DataFrame(history)
-            df["timestamp"] = pd.to_datetime(df["timestamp"])
-            fig2 = go.Figure()
-            if "match_score" in df:
-                fig2.add_trace(go.Scatter(x=df["timestamp"], y=df["match_score"], mode='lines+markers', name="Match Score"))
-            if "global_score" in df:
-                fig2.add_trace(go.Scatter(x=df["timestamp"], y=df["global_score"], mode='lines+markers', name="Global Score"))
-            st.plotly_chart(fig2, use_container_width=True)
 
     elif submitted:
         if not uploaded_file and not jd_text.strip():
