@@ -99,6 +99,30 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 🎯 Millennial-friendly dynamic heading
+st.markdown("""
+<h1 style='
+    text-align: center;
+    font-family: "Poppins", sans-serif;
+    font-weight: 600;
+    font-size: 2.5rem;
+    margin-top: 10px;
+    color: var(--text-color);
+'>
+🤖 LazyApply AI
+</h1>
+<p style='
+    text-align: center;
+    font-size: 1rem;
+    color: var(--text-color);
+    opacity: 0.6;
+    margin-top: -12px;
+'>
+Your Job Buddy for the Resume Revolution 🚀
+</p>
+""", unsafe_allow_html=True)
+
+
 
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
