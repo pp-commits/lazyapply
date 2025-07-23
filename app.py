@@ -58,7 +58,7 @@ st.markdown("""
     }
 
     .stButton button {
-        background: linear-gradient(90deg, #4bde91, #8c8cf1);
+        background: linear-gradient(90deg, var(--primary-color), #5e5eea);
         border: none;
         color: white;
         font-weight: 600;
@@ -70,7 +70,7 @@ st.markdown("""
 
     .stButton button:hover {
         filter: brightness(1.05);
-        box-shadow: 0 0 12px rgba(140, 140, 241, 0.4);
+        box-shadow: 0 0 12px rgba(94, 94, 234, 0.5);
     }
 
     .stDownloadButton button {
@@ -128,7 +128,8 @@ tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 # ------------ Phase 1: Resume Matching ------------
 with tab1:
-    st.markdown("Upload your resume and paste a job description to get tailored AI feedback. 💡 Tip: Use your favorite job post!")
+    st.markdown("Upload your resume and paste a job description to get tailored AI feedback.") 
+    st.markdown("💡 Tip: Use your favorite job post!")
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"], help="Only used locally. Never leaves your browser.")
     jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
 
