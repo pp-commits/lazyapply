@@ -64,7 +64,7 @@ PART 3: ATS Optimization
 - Executive summary + a table of scores and metrics
 - Conclude with: Ready to Apply, Needs Work, or Major Rewrite Needed
 
- PART 10: Global Benchmarking Score
+🌍 PART 10: Global Benchmarking Score
 - Score out of 100 using global benchmarks
 - Assign a percentile rank (e.g., Top 10%) and explain why
 

@@ -184,8 +184,27 @@ with tab1:
         else:
             result = st.session_state["feedback"]
 
-        result = str(result) if result else "⚠️ No result generated."
-        st.text_area("📊 AI Feedback", result, height=300)
+            result = str(result) if result else "⚠️ No result generated."
+            st.text_area("📊 AI Feedback", result, height=300)
+
+            # Show copy and download buttons
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("📋 Copy to Clipboard"):
+                    st.session_state["copied"] = True
+                if st.session_state.get("copied"):
+                    st.success("Copied!")
+
+            with col2:
+                st.download_button(
+                    label="⬇️ Download as .docx",
+                    data=generate_docx(result),
+                    file_name="lazyapply_output.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+
+                    
 
     elif submitted:
         if not uploaded_file and not jd_text.strip():
