@@ -50,7 +50,7 @@ with tab1:
     jd_text = st.text_area("💼 Paste the job description here", height=250)
 
     mode = st.selectbox("🧠 Choose AI Analysis Mode", [
-        "Full Resume Intelligence Report",
+        
         "Brutal Resume Review",
         "Rewrite to Sound Results-Driven",
         "Optimize for ATS",
@@ -58,7 +58,8 @@ with tab1:
         "Tailor Resume for Job Description",
         "Top 1% Candidate Benchmarking",
         "Generate Cover Letter",
-        "Suggest Resume Format"
+        "Suggest Resume Format,"
+        "Full Resume Intelligence Report",
     ])
 
     section = st.selectbox("🔹 Focus on a specific resume section?", [
