@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 import time
 import re
+import plotly.graph_objects as go
+import pandas as pd
 from io import BytesIO
 from docx import Document
 
@@ -9,7 +11,8 @@ from utils.resume_parser import parse_resume
 from utils.matcher import (
     get_match_feedback,
     get_batched_match_feedback,
-    get_custom_prompt_feedback
+    get_custom_prompt_feedback,
+    extract_score
 )
 from utils.prompt_templates import build_prompt
 from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
@@ -39,18 +42,22 @@ if "job_cache" not in st.session_state:
     st.session_state["job_cache"] = all_jobs
 
 st.set_page_config(page_title="LazyApply AI", layout="centered")
-st.title("🤖 LazyApply AI — Your Job Buddy!")
+st.markdown("""
+    <h1 style='text-align: center; color: #4B4B4B; font-family: "Poppins", sans-serif;'>
+    🤖 LazyApply AI <span style='font-size:0.8em; color: #888;'>Your Job Buddy</span>
+    </h1>
+""", unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 # ------------ Phase 1: Resume Matching ------------
 with tab1:
-    st.markdown("Upload your resume and paste a job description to get match feedback.")
-    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
-    jd_text = st.text_area("💼 Paste the job description here", height=250)
+    st.markdown("Upload your resume and paste a job description to get tailored AI feedback. 💡 Tip: Use your favorite job post!")
+    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"], help="Only used locally. Never leaves your browser.")
+    jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
 
     mode = st.selectbox("🧠 Choose AI Analysis Mode", [
-        
+        "🧠 Full Resume Intelligence Report",
         "Brutal Resume Review",
         "Rewrite to Sound Results-Driven",
         "Optimize for ATS",
@@ -58,8 +65,7 @@ with tab1:
         "Tailor Resume for Job Description",
         "Top 1% Candidate Benchmarking",
         "Generate Cover Letter",
-        "Suggest Resume Format",
-        "Full Resume Intelligence Report"
+        "Suggest Resume Format"
     ])
 
     section = st.selectbox("🔹 Focus on a specific resume section?", [
@@ -75,26 +81,22 @@ with tab1:
     chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
 
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
-    submitted = st.button("🚀 Generate Feedback")
+    submitted = st.button("🚀 Generate Feedback", help="Click once both resume and JD are ready")
 
     if submitted and resume_text and resume_text.strip() and jd_text.strip():
         key_hash = hash(resume_text + jd_text + mode + section + chosen_model)
 
         if st.session_state.get("input_hash") != key_hash:
             with st.spinner("🔬 Processing your resume..."):
-                
                 if mode == "Tailor Resume for Job Description" and not jd_text:
                     st.warning("This mode works best with a job description pasted above.")
-                if mode == "Full Resume Intelligence Report":
-                    from utils.matcher import get_full_resume_analysis
-                    result, score = get_full_resume_analysis(resume_text, jd_text)
-                else:
-                    result, score = get_custom_prompt_feedback(
-                        resume_text=resume_text,
-                        jd_text=jd_text,
-                        mode=mode,
-                        section=section,
-                        model=chosen_model
+
+                result, score = get_custom_prompt_feedback(
+                    resume_text=resume_text,
+                    jd_text=jd_text,
+                    mode=mode,
+                    section=section,
+                    model=chosen_model
                 )
                 st.session_state["input_hash"] = key_hash
                 st.session_state["feedback"] = str(result)
@@ -107,68 +109,47 @@ with tab1:
         result = str(result) if result else "⚠️ No result generated."
         st.text_area("📊 AI Feedback", result, height=300)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📋 Copy to Clipboard"):
-                st.session_state["copied"] = True
-            if st.session_state.get("copied"):
-                st.success("Copied!")
+        match_score = extract_score(result)
+        global_score_match = re.search(r"Global Score\s*[:\-]\s*(\d{1,3})", result, re.IGNORECASE)
+        global_percentile_match = re.search(r"Percentile Rank\s*[:\-]\s*Top\s*(\d{1,3})", result, re.IGNORECASE)
 
-        with col2:
-            st.download_button(
-                label="⬇️ Download as .docx",
-                data=generate_docx(result),
-                file_name="lazyapply_output.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+        global_score = int(global_score_match.group(1)) if global_score_match else None
+        percentile = int(global_percentile_match.group(1)) if global_percentile_match else None
 
-        with st.expander("📄 View My Feedback History"):
-            history = get_history()
-            if not history:
-                st.info("No past matches found.")
-            else:
-                for i, entry in enumerate(history[:5]):
-                    st.markdown(f"**{entry['timestamp']}**")
-                    st.code(entry['feedback'], language='markdown')
+        if match_score or global_score:
+            st.markdown("### 📊 Resume Evaluation Metrics")
+            st.table({
+                "Metric": ["Match Score", "Global Resume Score", "Percentile Rank"],
+                "Value": [
+                    f"{match_score}/100" if match_score else "N/A",
+                    f"{global_score}/100" if global_score else "N/A",
+                    f"Top {percentile}%" if percentile else "N/A"
+                ]
+            })
 
-        if mode == "Tailor Resume for Job Description":
-            all_jobs = st.session_state["job_cache"]
-            flat_jobs = [{"company": comp, **job} for comp, jobs in all_jobs.items() for job in jobs]
-            summaries = [job["summary"] for job in flat_jobs]
-            feedbacks = get_batched_match_feedback(resume_text, summaries)
+            fig = go.Figure(data=go.Heatmap(
+                z=[[match_score, global_score, 90]],
+                x=["Match Score", "Global Score", "ATS Score (est.)"],
+                y=["Resume"],
+                colorscale="RdYlGn",
+                zmin=0,
+                zmax=100,
+                showscale=True
+            ))
+            st.plotly_chart(fig, use_container_width=True)
 
-            scored_jobs = []
-            for job, feedback in zip(flat_jobs, feedbacks):
-                if isinstance(feedback, tuple):
-                    feedback_text = feedback[0]
-                    match = re.search(r'(\d{1,3})\s*(?:/|out of)\s*100', feedback_text, re.IGNORECASE)
-                    if match:
-                        score_val = int(match.group(1))
-                        scored_jobs.append({
-                            "company": job["company"],
-                            "title": job["title"],
-                            "location": job["location"],
-                            "score": score_val,
-                            "link": job["link"],
-                            "summary": job["summary"]
-                        })
+        st.markdown("### 📈 Resume Score Progress Over Time")
+        history = get_history()
+        if history:
+            df = pd.DataFrame(history)
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+            fig2 = go.Figure()
+            if "match_score" in df:
+                fig2.add_trace(go.Scatter(x=df["timestamp"], y=df["match_score"], mode='lines+markers', name="Match Score"))
+            if "global_score" in df:
+                fig2.add_trace(go.Scatter(x=df["timestamp"], y=df["global_score"], mode='lines+markers', name="Global Score"))
+            st.plotly_chart(fig2, use_container_width=True)
 
-            if scored_jobs:
-                st.markdown("---")
-                st.subheader("📌 Similar Jobs You May Like")
-                for job in sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]:
-                    with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
-                        st.markdown(f"**Location**: {job['location']}")
-                        st.markdown(f"**Apply**: [Click here]({job['link']})")
-                        if st.button(f"🔍 Recalculate with Full JD for '{job['title']}'", key=f"recalc_{job['title']}"):
-                            with st.spinner("Fetching full JD and rescoring..."):
-                                full_jd = fetch_full_job_description(job["link"])
-                                if full_jd:
-                                    updated = get_match_feedback(resume_text, full_jd)
-                                    updated_str = str(updated[0]) if isinstance(updated, tuple) else str(updated)
-                                    st.text_area("📊 Updated Feedback", updated_str, height=300)
-                                else:
-                                    st.error("Could not fetch full job description.")
     elif submitted:
         if not uploaded_file and not jd_text.strip():
             st.info("Upload your resume and paste a job description to begin.")
