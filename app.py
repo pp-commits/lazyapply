@@ -81,15 +81,19 @@ with tab1:
 
         if st.session_state.get("input_hash") != key_hash:
             with st.spinner("🔬 Processing your resume..."):
+                
                 if mode == "Tailor Resume for Job Description" and not jd_text:
                     st.warning("This mode works best with a job description pasted above.")
-
-                result, score = get_custom_prompt_feedback(
-                    resume_text=resume_text,
-                    jd_text=jd_text,
-                    mode=mode,
-                    section=section,
-                    model=chosen_model
+                if mode == "🧠 Full Resume Intelligence Report":
+                    from utils.matcher import get_full_resume_analysis
+                    result, score = get_full_resume_analysis(resume_text, jd_text)
+                else:
+                    result, score = get_custom_prompt_feedback(
+                        resume_text=resume_text,
+                        jd_text=jd_text,
+                        mode=mode,
+                        section=section,
+                        model=chosen_model
                 )
                 st.session_state["input_hash"] = key_hash
                 st.session_state["feedback"] = str(result)
