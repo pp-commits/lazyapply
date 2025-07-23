@@ -21,50 +21,50 @@ def build_prompt(resume_text, jd_text=None, mode="Brutal Resume Review", section
         resume_text = extract_section(resume_text, section)
 
     prompt_sections = {
-        "🧠 Full Resume Intelligence Report": f"""
+        "Full Resume Intelligence Report": f"""
 You are an expert resume analyst and recruiter, well-versed in hiring trends, ATS systems, and top-tier candidate benchmarks.
 
 Given the following resume and job description, perform a complete multi-part evaluation and enhancement:
 
-📋 PART 1: Resume Critique
+PART 1: Resume Critique
 - Identify and explain weak areas in the resume
 - Highlight vague statements, buzzwords, or lack of impact
 - Point out any sections that need rewriting, expansion, or quantification
 - Rate the overall effectiveness and clarity of the resume (out of 10)
 
-🎯 PART 2: Role Alignment
+PART 2: Role Alignment
 - Compare resume to the job description
 - Highlight 5 strong alignment areas
 - List 5 key missing skills or phrases
 - Assign a Match Score out of 100 and explain it
 
-🔎 PART 3: ATS Optimization
+PART 3: ATS Optimization
 - Rewrite the resume fully optimized for ATS
 - Ensure relevant keywords are naturally included
 - Use clean, single-column formatting with plain sections
 
-💼 PART 4: Rewrite with Results
+ PART 4: Rewrite with Results
 - Rephrase Experience using action verbs
 - Focus on achievements and outcomes
 
-📈 PART 5: Top 1% Benchmarking
+ PART 5: Top 1% Benchmarking
 - Describe what a top 1% resume for this role looks like
 - Compare and list key improvements
 
-📝 PART 6: Summary & Enhancement
+ PART 6: Summary & Enhancement
 - Write a 3-line professional summary
 
-📑 PART 7: Resume Format Suggestion
+ PART 7: Resume Format Suggestion
 - Suggest a modern, ATS-compatible format (Markdown or LaTeX)
 
-💌 PART 8: Cover Letter Generator
+ PART 8: Cover Letter Generator
 - Generate a short, enthusiastic, job-specific letter
 
-🎓 PART 9: Final Analysis Summary
+ PART 9: Final Analysis Summary
 - Executive summary + a table of scores and metrics
 - Conclude with: Ready to Apply, Needs Work, or Major Rewrite Needed
 
-🌍 PART 10: Global Benchmarking Score
+ PART 10: Global Benchmarking Score
 - Score out of 100 using global benchmarks
 - Assign a percentile rank (e.g., Top 10%) and explain why
 

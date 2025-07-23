@@ -84,7 +84,7 @@ with tab1:
                 
                 if mode == "Tailor Resume for Job Description" and not jd_text:
                     st.warning("This mode works best with a job description pasted above.")
-                if mode == "🧠 Full Resume Intelligence Report":
+                if mode == "Full Resume Intelligence Report":
                     from utils.matcher import get_full_resume_analysis
                     result, score = get_full_resume_analysis(resume_text, jd_text)
                 else:
