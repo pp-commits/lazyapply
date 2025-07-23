@@ -90,14 +90,16 @@ with tab1:
                     model=chosen_model
                 )
                 st.session_state["input_hash"] = key_hash
-                st.session_state["feedback"] = result
+                st.session_state["feedback"] = str(result)
                 st.session_state["copied"] = False
 
                 save_match(resume_text, jd_text, result)  # ✅ Save to history
         else:
             result = st.session_state["feedback"]
 
-        st.text_area("\ud83d\udcca AI Feedback", result, height=300)
+        result = str(result) if result else "⚠️ No result generated."
+        st.text_area("📊 AI Feedback", result, height=300)
+
 
         col1, col2 = st.columns(2)
         with col1:
