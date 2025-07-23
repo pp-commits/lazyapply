@@ -2,11 +2,19 @@ import streamlit as st
 import requests
 import time
 import re
-from utils.resume_parser import parse_resume
-from utils.matcher import get_match_feedback, get_batched_match_feedback
-from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
+from io import BytesIO
+from docx import Document
 
-# ------------ Config for Supported Companies ------------
+from utils.resume_parser import parse_resume
+from utils.matcher import (
+    get_match_feedback,
+    get_batched_match_feedback,
+    get_custom_prompt_feedback
+)
+from utils.prompt_templates import build_prompt
+from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
+from utils.history import save_match, get_history
+
 SUPPORTED_COMPANIES = {
     "Razorpay": "razorpaysoftwareprivatelimited",
     "Postman": "postman",
@@ -14,7 +22,15 @@ SUPPORTED_COMPANIES = {
     "Groww": "groww"
 }
 
-# ------------ Cache Greenhouse Jobs Initially ------------
+def generate_docx(text):
+    doc = Document()
+    for line in text.split("\n"):
+        doc.add_paragraph(line)
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
 if "job_cache" not in st.session_state:
     all_jobs = {}
     for comp_name, slug in SUPPORTED_COMPANIES.items():
@@ -25,7 +41,7 @@ if "job_cache" not in st.session_state:
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 st.title("🤖 LazyApply AI — Your Job Buddy!")
 
-tab1, tab2 = st.tabs(["📄 Match Resume", "🴭 Explore Jobs"])
+tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 # ------------ Phase 1: Resume Matching ------------
 with tab1:
@@ -33,38 +49,57 @@ with tab1:
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
     jd_text = st.text_area("💼 Paste the job description here", height=250)
 
+    mode = st.selectbox("🧠 Choose AI Analysis Mode", [
+        "Brutal Resume Review",
+        "Rewrite to Sound Results-Driven",
+        "Optimize for ATS",
+        "Generate Professional Summary",
+        "Tailor Resume for Job Description",
+        "Top 1% Candidate Benchmarking",
+        "Generate Cover Letter",
+        "Suggest Resume Format"
+    ])
+
+    section = st.selectbox("🔹 Focus on a specific resume section?", [
+        "Entire Resume", "Professional Summary", "Experience", "Education", "Projects"
+    ]) if mode == "Rewrite to Sound Results-Driven" else "Entire Resume"
+
+    model_choice = st.radio(
+        "Choose model:",
+        ["Exaone (Deep & Accurate)", "Mistral (Fast & Light)"],
+        index=0,
+        horizontal=True
+    )
+    chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
+
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
 
-    if resume_text and jd_text and resume_text.strip():
-        input_hash = hash(resume_text + jd_text)
+    if resume_text and resume_text.strip():
+        key_hash = hash(resume_text + jd_text + mode + section + chosen_model)
 
-        # Trigger AI only if content changed
-        if st.session_state.get("input_hash") != input_hash:
-            progress = st.progress(0)
-            status_placeholder = st.empty()
-            feedback_placeholder = st.empty()
+        if st.session_state.get("input_hash") != key_hash:
+            with st.spinner("🔬 Processing your resume..."):
+                if mode == "Tailor Resume for Job Description" and not jd_text:
+                    st.warning("This mode works best with a job description pasted above.")
 
-            status_msgs = ["🔍 Analyzing Resume", "📄 Parsing JD", "⚙️ Matching Skills", "🧠 Generating Insights"]
-            for i, msg in enumerate(status_msgs):
-                status_placeholder.markdown(f"**{msg}...**")
-                progress.progress((i + 1) * 20)
-                time.sleep(0.7)
+                result, score = get_custom_prompt_feedback(
+                    resume_text=resume_text,
+                    jd_text=jd_text,
+                    mode=mode,
+                    section=section,
+                    model=chosen_model
+                )
+                st.session_state["input_hash"] = key_hash
+                st.session_state["feedback"] = result
+                st.session_state["copied"] = False
 
-            real_feedback = get_match_feedback(resume_text, jd_text)
-
-            progress.progress(100)
-            status_placeholder.markdown("✅ Done.")
-
-            st.session_state["input_hash"] = input_hash
-            st.session_state["feedback"] = real_feedback
-            st.session_state["copied"] = False
+                save_match(resume_text, jd_text, result)  # ✅ Save to history
         else:
-            real_feedback = st.session_state["feedback"]
+            result = st.session_state["feedback"]
 
-        st.text_area("📊 AI Feedback", real_feedback if isinstance(real_feedback, str) else real_feedback[0], height=300)
+        st.text_area("\ud83d\udcca AI Feedback", result, height=300)
 
         col1, col2 = st.columns(2)
-
         with col1:
             if st.button("📋 Copy to Clipboard"):
                 st.session_state["copied"] = True
@@ -73,29 +108,31 @@ with tab1:
 
         with col2:
             st.download_button(
-                label="⬇️ Download Report",
-                data=real_feedback[0].encode("utf-8") if isinstance(real_feedback, tuple) else real_feedback.encode("utf-8"),
-                file_name="match_feedback.txt",
-                mime="text/plain"
+                label="⬇️ Download as .docx",
+                data=generate_docx(result),
+                file_name="lazyapply_output.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-        # Batch match with cached jobs
-        if "similar_jobs" not in st.session_state or st.session_state["input_hash"] != input_hash:
+        with st.expander("\ud83d\udcdc View My Feedback History"):
+            history = get_history()
+            if not history:
+                st.info("No past matches found.")
+            else:
+                for i, entry in enumerate(history[:5]):
+                    st.markdown(f"**{entry['timestamp']}**")
+                    st.code(entry['feedback'], language='markdown')
+
+        if mode == "Tailor Resume for Job Description":
             all_jobs = st.session_state["job_cache"]
             flat_jobs = [{"company": comp, **job} for comp, jobs in all_jobs.items() for job in jobs]
             summaries = [job["summary"] for job in flat_jobs]
             feedbacks = get_batched_match_feedback(resume_text, summaries)
 
             scored_jobs = []
-            debug_logs = []
-
-            for idx, (job, feedback) in enumerate(zip(flat_jobs, feedbacks)):
-                try:
-                    if isinstance(feedback, tuple):
-                        feedback_text = feedback[0]
-                    else:
-                        feedback_text = feedback
-
+            for job, feedback in zip(flat_jobs, feedbacks):
+                if isinstance(feedback, tuple):
+                    feedback_text = feedback[0]
                     match = re.search(r'(\d{1,3})\s*(?:/|out of)\s*100', feedback_text, re.IGNORECASE)
                     if match:
                         score_val = int(match.group(1))
@@ -107,55 +144,27 @@ with tab1:
                             "link": job["link"],
                             "summary": job["summary"]
                         })
-                    else:
-                        debug_logs.append(f"Job {idx+1}: Match Score not found.")
-                except Exception as e:
-                    debug_logs.append(f"Job {idx+1} Error: {str(e)}")
 
-            st.session_state["similar_jobs"] = scored_jobs
-            st.session_state["debug_logs"] = debug_logs
-        else:
-            scored_jobs = st.session_state["similar_jobs"]
-            debug_logs = st.session_state.get("debug_logs", [])
-
-        st.markdown("---")
-        st.subheader("📌 Similar Jobs You May Like")
-
-        if scored_jobs:
-            sorted_jobs = sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]
-            for job in sorted_jobs:
-                with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
-                    st.markdown(f"**Location**: {job['location']}")
-                    st.markdown(f"**Apply**: [Click here]({job['link']})")
-
-                    if st.button(f"🔍 Recalculate with Full JD for '{job['title']}'", key=f"recalc_{job['title']}"):
-                        with st.spinner("Fetching full JD and rescoring..."):
-                            full_jd = fetch_full_job_description(job["link"])
-                            if full_jd:
-                                updated = get_match_feedback(resume_text, full_jd)
-                                if isinstance(updated, tuple):
-                                    new_feedback, new_score = updated
-                                    #st.success(f"✅ Updated Match Score: {new_score}/100")
-                                    st.text_area("📊 Updated Feedback", new_feedback, height=300)
+            if scored_jobs:
+                st.markdown("---")
+                st.subheader("📌 Similar Jobs You May Like")
+                for job in sorted(scored_jobs, key=lambda x: x["score"], reverse=True)[:5]:
+                    with st.expander(f"{job['title']} at {job['company']} — Match Score: {job['score']}%"):
+                        st.markdown(f"**Location**: {job['location']}")
+                        st.markdown(f"**Apply**: [Click here]({job['link']})")
+                        if st.button(f"🔍 Recalculate with Full JD for '{job['title']}'", key=f"recalc_{job['title']}"):
+                            with st.spinner("Fetching full JD and rescoring..."):
+                                full_jd = fetch_full_job_description(job["link"])
+                                if full_jd:
+                                    updated = get_match_feedback(resume_text, full_jd)
+                                    if isinstance(updated, tuple):
+                                        st.text_area("\ud83d\udcca Updated Feedback", updated[0], height=300)
+                                    else:
+                                        st.text_area("\ud83d\udcca Updated Feedback", updated, height=300)
                                 else:
-                                    st.text_area("📊 Updated Feedback", updated, height=300)
-                                    st.warning("Could not extract score from LLM output.")
-                            else:
-                                st.error("⚠️ Could not fetch full job description.")
-        else:
-            st.warning("No valid scores returned from LLM.")
-
-        #if debug_logs:
-            #st.markdown("**Debug Info:**")
-            #for log in debug_logs:
-                #st.markdown(f"- {log}")
-
-    elif not uploaded_file:
-        st.info("Please upload a resume.")
-    elif not jd_text:
-        st.info("Please paste a job description.")
+                                    st.error("Could not fetch full job description.")
     else:
-        st.warning("Resume text could not be extracted.")
+        st.info("Upload your resume to begin.")
 
 # ------------ Phase 2: Explore Jobs ------------
 with tab2:
@@ -176,7 +185,6 @@ with tab2:
                     st.markdown(f"**Company**: {selected_company}")
                     st.markdown(f"**Location**: {job['location']}")
                     st.markdown(f"**Link**: [Apply Here]({job['link']})")
-                    #st.markdown(f"**Summary**:\n\n{job['summary']}")
 
                     if uploaded_file:
                         unique_key = f"{job['title']}_{job['link'].split('/')[-1]}"

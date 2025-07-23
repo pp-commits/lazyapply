@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import re  # For extracting scores
+from utils.prompt_templates import build_prompt  # ✅ New import
 
 # 🔐 Load API key securely
 TOGETHER_API_KEY = st.secrets["together"]["api_key"]
@@ -12,7 +13,7 @@ headers = {
 
 # 🧠 Models
 MAIN_MODEL = "lgai/exaone-3-5-32b-instruct"  # Deep analysis
-LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"           # Fast summaries
+LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"  # Fast summaries
 API_URL = "https://api.together.xyz/v1/chat/completions"
 
 print(f"[DEBUG] Primary model: {MAIN_MODEL}")
@@ -103,3 +104,18 @@ Job Summary:
             results.append(("⚠️ API error or no result.", None))
 
     return results
+
+# ✅ New: Modular prompt handler
+def get_custom_prompt_feedback(resume_text, jd_text=None, mode="Brutal Resume Review", section="Entire Resume", model=MAIN_MODEL):
+    """
+    Flexible prompt-based feedback engine.
+    Supports modes like ATS, rewriting, summary, tailoring, etc.
+    """
+    prompt = build_prompt(resume_text, jd_text, mode=mode, section=section)
+    result = call_together_api(prompt, model=model)
+
+    if result:
+        score = extract_score(result)
+        return result, score
+    else:
+        return "⚠️ API error or no result.", None

@@ -8,7 +8,7 @@ def save_match(resume_text, jd_text, feedback):
     entry = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "resume_excerpt": resume_text[:300],
-        "jd_excerpt": jd_text[:300],
+        "jd_excerpt": jd_text[:300] if jd_text else "N/A",
         "feedback": feedback
     }
 
@@ -20,7 +20,7 @@ def save_match(resume_text, jd_text, feedback):
             except json.JSONDecodeError:
                 history = []
 
-    history.insert(0, entry)  # add newest match to top
+    history.insert(0, entry)  # newest first
 
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f, indent=2)
