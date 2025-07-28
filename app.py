@@ -2,9 +2,9 @@ import streamlit as st
 import requests
 import time
 import re
+import sqlite3
 from io import BytesIO
 from docx import Document
-
 from utils.resume_parser import parse_resume
 from utils.matcher import (
     get_match_feedback,
@@ -32,6 +32,52 @@ def generate_docx(text):
     buffer.seek(0)
     return buffer
 
+# Initialize SQLite DB
+conn = sqlite3.connect("users.db")
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password TEXT
+)''')
+conn.commit()
+
+# Session state
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+# Auth block
+with st.sidebar:
+    st.subheader("🔐 Login / Sign Up")
+    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+
+    with tab_login:
+        login_user = st.text_input("Username", key="login_user")
+        login_pass = st.text_input("Password", type="password", key="login_pass")
+        if st.button("Login"):
+            c.execute("SELECT * FROM users WHERE username=? AND password=?", (login_user, login_pass))
+            if c.fetchone():
+                st.success("Logged in successfully!")
+                st.session_state.logged_in = True
+                st.session_state.username = login_user
+            else:
+                st.error("Invalid credentials")
+
+    with tab_signup:
+        signup_user = st.text_input("New Username", key="signup_user")
+        signup_pass = st.text_input("New Password", type="password", key="signup_pass")
+        if st.button("Sign Up"):
+            try:
+                c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (signup_user, signup_pass))
+                conn.commit()
+                st.success("Account created! You can now login.")
+            except sqlite3.IntegrityError:
+                st.error("Username already exists.")
+
+if not st.session_state.logged_in:
+    st.info("Some features will unlock after login.")
+
 if "job_cache" not in st.session_state:
     all_jobs = {}
     for comp_name, slug in SUPPORTED_COMPANIES.items():
@@ -41,22 +87,19 @@ if "job_cache" not in st.session_state:
 
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 
-# Inject global fonts & style
+# Style and Main UI Heading
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
         background-color: var(--background-color);
         color: var(--text-color);
     }
-
     h1, h2, h3 {
         font-weight: 600;
         color: var(--text-color);
     }
-
     .stButton button {
         background: linear-gradient(90deg, var(--primary-color), #5e5eea);
         border: none;
@@ -67,23 +110,19 @@ st.markdown("""
         box-shadow: 0 0 8px rgba(75, 222, 145, 0.3);
         transition: all 0.3s ease-in-out;
     }
-
     .stButton button:hover {
         filter: brightness(1.05);
         box-shadow: 0 0 12px rgba(94, 94, 234, 0.5);
     }
-
     .stDownloadButton button {
         background: #222;
         color: white;
         border-radius: 12px;
         font-weight: bold;
     }
-
     .stDownloadButton button:hover {
         background: #000;
     }
-
     .stTextInput>div>div>input,
     .stTextArea textarea {
         background-color: var(--background-color);
@@ -92,14 +131,12 @@ st.markdown("""
         border: 1px solid #dce6f7;
         padding: 10px;
     }
-
     .stRadio>div>label {
         font-weight: 500;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 🎯 Millennial-friendly dynamic heading
 st.markdown("""
 <h1 style='
     text-align: center;
@@ -121,128 +158,3 @@ st.markdown("""
 Your Job Buddy for the Resume Revolution 🚀
 </p>
 """, unsafe_allow_html=True)
-
-
-
-tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
-
-# ------------ Phase 1: Resume Matching ------------
-with tab1:
-    st.markdown("Upload your resume and paste a job description to get tailored AI feedback.") 
-    st.markdown("💡 Tip: Use your favorite job post!")
-    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"], help="Only used locally. Never leaves your browser.")
-    jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
-
-    mode = st.selectbox("🧠 Choose AI Analysis Mode", [
-        
-        "Brutal Resume Review",
-        "Rewrite to Sound Results-Driven",
-        "Optimize for ATS",
-        "Generate Professional Summary",
-        "Tailor Resume for Job Description",
-        "Top 1% Candidate Benchmarking",
-        "Generate Cover Letter",
-        "Suggest Resume Format",
-       "Full Resume Intelligence Report"
-    ])
-
-    section = st.selectbox("🔹 Focus on a specific resume section?", [
-        "Entire Resume", "Professional Summary", "Experience", "Education", "Projects"
-    ]) if mode == "Rewrite to Sound Results-Driven" else "Entire Resume"
-
-    model_choice = st.radio(
-        "Choose model:",
-        ["Exaone (Deep & Accurate)", "Mistral (Fast & Light)"],
-        index=0,
-        horizontal=True
-    )
-    chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
-
-    resume_text = parse_resume(uploaded_file) if uploaded_file else None
-    submitted = st.button("🚀 Generate Feedback", help="Click once both resume and JD are ready")
-
-    if submitted and resume_text and resume_text.strip() and jd_text.strip():
-        key_hash = hash(resume_text + jd_text + mode + section + chosen_model)
-
-        if st.session_state.get("input_hash") != key_hash:
-            with st.spinner("🔬 Processing your resume..."):
-                if mode == "Tailor Resume for Job Description" and not jd_text:
-                    st.warning("This mode works best with a job description pasted above.")
-
-                result, score = get_custom_prompt_feedback(
-                    resume_text=resume_text,
-                    jd_text=jd_text,
-                    mode=mode,
-                    section=section,
-                    model=chosen_model
-                )
-                st.session_state["input_hash"] = key_hash
-                st.session_state["feedback"] = str(result)
-                st.session_state["copied"] = False
-
-                save_match(resume_text, jd_text, result)
-        else:
-            result = st.session_state["feedback"]
-
-            result = str(result) if result else "⚠️ No result generated."
-            st.text_area("📊 AI Feedback", result, height=300)
-
-            # Show copy and download buttons
-            col1, col2 = st.columns(2)
-
-            with col1:
-                if st.button("📋 Copy to Clipboard"):
-                    st.session_state["copied"] = True
-                if st.session_state.get("copied"):
-                    st.success("Copied!")
-
-            with col2:
-                st.download_button(
-                    label="⬇️ Download as .docx",
-                    data=generate_docx(result),
-                    file_name="lazyapply_output.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
-
-                    
-
-    elif submitted:
-        if not uploaded_file and not jd_text.strip():
-            st.info("Upload your resume and paste a job description to begin.")
-        elif not uploaded_file:
-            st.warning("Please upload your resume.")
-        elif not jd_text.strip():
-            st.warning("Please paste a job description.")
-
-# ------------ Phase 2: Explore Jobs ------------
-with tab2:
-    st.markdown("🧠 Select a company and search job roles:")
-    selected_company = st.selectbox("🏢 Choose a company", list(SUPPORTED_COMPANIES.keys()))
-    company_slug = SUPPORTED_COMPANIES[selected_company]
-    keyword = st.text_input("🔍 Search by keyword", value="engineering")
-
-    if keyword:
-        jobs = fetch_greenhouse_jobs(company_slug, limit=10, keyword=keyword)
-        if isinstance(jobs, str):
-            st.error(jobs)
-        elif not jobs:
-            st.warning("No roles found for this keyword.")
-        else:
-            for job in jobs:
-                with st.expander(f"🔧 {job['title']} – {job['location']}"):
-                    st.markdown(f"**Company**: {selected_company}")
-                    st.markdown(f"**Location**: {job['location']}")
-                    st.markdown(f"**Link**: [Apply Here]({job['link']})")
-
-                    if uploaded_file:
-                        unique_key = f"{job['title']}_{job['link'].split('/')[-1]}"
-                        if st.button(f"⚡ Match My Resume with {job['title']}", key=unique_key):
-                            resume_text = parse_resume(uploaded_file)
-                            with st.spinner("Matching in progress..."):
-                                feedback = get_match_feedback(resume_text, job['summary'])
-                            st.success("✅ Match completed!")
-                            st.text_area("📊 Feedback", feedback if isinstance(feedback, str) else feedback[0], height=300)
-                    else:
-                        st.info("Upload resume in Tab 1 to enable matching.")
-    else:
-        st.info("Please enter a keyword to search job roles.")
