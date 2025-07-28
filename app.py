@@ -5,6 +5,9 @@ import re
 import sqlite3
 from io import BytesIO
 from docx import Document
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
 
 from utils.resume_parser import parse_resume
 from utils.matcher import (
@@ -50,43 +53,28 @@ def generate_docx(text):
     buffer.seek(0)
     return buffer
 
-# -------------------- AUTH SIDEBAR --------------------
-with st.sidebar:
-    st.subheader("🔐 Login / Sign Up")
-    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+# -------------------- AUTH CONFIG --------------------
+with open("config.yaml") as file:
+    config = yaml.load(file, Loader=SafeLoader)
 
-    with tab_login:
-        login_user = st.text_input("Username", key="login_user")
-        login_pass = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            c.execute("SELECT * FROM users WHERE username=? AND password=?", (login_user, login_pass))
-            if c.fetchone():
-                st.success("Logged in successfully!")
-                st.session_state.logged_in = True
-                st.session_state.username = login_user
-            else:
-                st.error("Invalid credentials")
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"]
+)
 
-    with tab_signup:
-        signup_user = st.text_input("New Username", key="signup_user")
-        signup_pass = st.text_input("New Password", type="password", key="signup_pass")
-        if st.button("Sign Up"):
-            try:
-                c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (signup_user, signup_pass))
-                conn.commit()
-                st.success("Account created! You can now login.")
-            except sqlite3.IntegrityError:
-                st.error("Username already exists.")
+name, auth_status, username = authenticator.login("Login", "sidebar")
 
-if st.session_state.logged_in:
-    st.sidebar.markdown("---")
-    st.sidebar.success(f"👋 Welcome, {st.session_state.username}")
-    if st.sidebar.button("🔓 Logout"):
-        st.session_state.logged_in = False
-        st.session_state.username = ""
-        st.experimental_rerun()
-else:
-    st.info("Some features will unlock after login.")
+if auth_status == False:
+    st.sidebar.error("❌ Invalid credentials")
+elif auth_status == None:
+    st.sidebar.info("Some features will unlock after login.")
+elif auth_status:
+    st.session_state.logged_in = True
+    st.session_state.username = username
+    st.sidebar.success(f"👋 Welcome, {username}")
+    authenticator.logout("Logout", "sidebar")
 
 # -------------------- CACHE JOBS --------------------
 if "job_cache" not in st.session_state:
