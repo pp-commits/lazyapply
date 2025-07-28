@@ -54,27 +54,40 @@ def generate_docx(text):
     return buffer
 
 # -------------------- AUTH CONFIG --------------------
+# Load config.yaml
 with open("config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
+
+# Inject secrets into config (from .streamlit/secrets.toml)
+config["oauth"]["providers"]["google"]["client_id"] = st.secrets["GOOGLE_CLIENT_ID"]
+config["oauth"]["providers"]["google"]["client_secret"] = st.secrets["GOOGLE_CLIENT_SECRET"]
+config["oauth"]["providers"]["github"]["client_id"] = st.secrets["GITHUB_CLIENT_ID"]
+config["oauth"]["providers"]["github"]["client_secret"] = st.secrets["GITHUB_CLIENT_SECRET"]
+config["cookie"]["key"] = st.secrets["lazyapply_signature"]
 
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
     config["cookie"]["key"],
-    config["cookie"]["expiry_days"]
+    config["cookie"]["expiry_days"],
+    config["preauthorized"],
+    config["oauth"]
 )
 
+# Show login widget in sidebar
 name, auth_status, username = authenticator.login("Login", "sidebar")
 
-if auth_status == False:
+# Handle login states
+if auth_status is False:
     st.sidebar.error("❌ Invalid credentials")
-elif auth_status == None:
-    st.sidebar.info("Some features will unlock after login.")
+elif auth_status is None:
+    st.sidebar.info("Please log in to access full features.")
 elif auth_status:
     st.session_state.logged_in = True
     st.session_state.username = username
     st.sidebar.success(f"👋 Welcome, {username}")
     authenticator.logout("Logout", "sidebar")
+
 
 # -------------------- CACHE JOBS --------------------
 if "job_cache" not in st.session_state:
