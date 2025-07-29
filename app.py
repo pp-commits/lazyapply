@@ -119,14 +119,10 @@ def login_ui():
         f"&state=login&access_type=offline&prompt=consent"
     )
 
-    github_link = (
-        f"https://github.com/login/oauth/authorize?client_id={st.secrets['GITHUB_CLIENT_ID']}"
-        f"&redirect_uri=https://lazyapply.streamlit.app/oauth2callback"
-        f"&scope=read:user user:email&state=login"
-    )
+    
 
     st.sidebar.markdown(f"[🔐 Login with Google]({google_link})", unsafe_allow_html=True)
-    st.sidebar.markdown(f"[💻 Login with GitHub]({github_link})", unsafe_allow_html=True)
+    #st.sidebar.markdown(f"[💻 Login with GitHub]({github_link})", unsafe_allow_html=True)
 
 
 # -------------------- AUTH CHECK --------------------
