@@ -58,31 +58,29 @@ def generate_docx(text):
 with open("config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
 
-# Inject secrets into config (from .streamlit/secrets.toml)
-config["oauth"]["providers"]["google"]["client_id"] = st.secrets["GOOGLE_CLIENT_ID"]
-config["oauth"]["providers"]["google"]["client_secret"] = st.secrets["GOOGLE_CLIENT_SECRET"]
-config["oauth"]["providers"]["github"]["client_id"] = st.secrets["GITHUB_CLIENT_ID"]
-config["oauth"]["providers"]["github"]["client_secret"] = st.secrets["GITHUB_CLIENT_SECRET"]
+# Inject secrets
+config["oauth"]["credentials"]["google"]["client_id"] = st.secrets["GOOGLE_CLIENT_ID"]
+config["oauth"]["credentials"]["google"]["client_secret"] = st.secrets["GOOGLE_CLIENT_SECRET"]
+config["oauth"]["credentials"]["github"]["client_id"] = st.secrets["GITHUB_CLIENT_ID"]
+config["oauth"]["credentials"]["github"]["client_secret"] = st.secrets["GITHUB_CLIENT_SECRET"]
 
 authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
-    
+    credentials=config["credentials"],
+    cookie_name=config["cookie"]["name"],
+    key=config["cookie"]["key"],
+    expiry_days=config["cookie"]["expiry_days"],
+    oauth_credentials=config["oauth"]["credentials"]
 )
 
-# Show login widget in sidebar
 login_info = authenticator.login(location="sidebar")
 
 if login_info:
     name = login_info["name"]
-    auth_status = login_info["authenticated"]
     username = login_info["username"]
+    auth_status = login_info["authenticated"]
 else:
     name = username = None
     auth_status = None
-
 
 # Handle login states
 if auth_status is False:
@@ -94,6 +92,7 @@ elif auth_status:
     st.session_state.username = username
     st.sidebar.success(f"👋 Welcome, {username}")
     authenticator.logout("Logout", "sidebar")
+
 
 
 # -------------------- CACHE JOBS --------------------
