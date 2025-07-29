@@ -69,7 +69,7 @@ def handle_oauth_callback():
             st.error("Unknown OAuth provider.")
             return
 
-        redirect_uri = "https://lazyapply.streamlit.app"
+        redirect_uri = "https://lazyapply.streamlit.app/oauth2callback"
         data = {
             "client_id": client_id,
             "client_secret": client_secret,
@@ -115,12 +115,12 @@ def login_ui():
     google_link = (
         f"https://accounts.google.com/o/oauth2/v2/auth?client_id={st.secrets['GOOGLE_CLIENT_ID']}"
         f"&response_type=code&scope=openid%20email%20profile"
-        f"&redirect_uri={"https://lazyapply.streamlit.app"}&state=login&access_type=offline&prompt=consent"
+        f"&redirect_uri={"https://lazyapply.streamlit.app/oauth2callback"}&state=login&access_type=offline&prompt=consent"
         f"&provider=google"
     )
     github_link = (
         f"https://github.com/login/oauth/authorize?client_id={st.secrets['GITHUB_CLIENT_ID']}"
-        f"&redirect_uri={"https://lazyapply.streamlit.app"}&scope=read:user%20user:email&state=login&provider=github"
+        f"&redirect_uri={"https://lazyapply.streamlit.app/oauth2callback"}&scope=read:user%20user:email&state=login&provider=github"
     )
 
     st.sidebar.markdown(f"[🔵 Sign in with Google]({google_link})")
