@@ -115,16 +115,19 @@ def login_ui():
     google_link = (
         f"https://accounts.google.com/o/oauth2/v2/auth?client_id={st.secrets['GOOGLE_CLIENT_ID']}"
         f"&response_type=code&scope=openid%20email%20profile"
-        f"&redirect_uri={"https://lazyapply.streamlit.app/oauth2callback"}&state=login&access_type=offline&prompt=consent"
-        f"&provider=google"
-    )
-    github_link = (
-        f"https://github.com/login/oauth/authorize?client_id={st.secrets['GITHUB_CLIENT_ID']}"
-        f"&redirect_uri={"https://lazyapply.streamlit.app/oauth2callback"}&scope=read:user%20user:email&state=login&provider=github"
+        f"&redirect_uri=https://lazyapply.streamlit.app/oauth2callback"
+        f"&state=login&access_type=offline&prompt=consent"
     )
 
-    st.sidebar.markdown(f"[🔵 Sign in with Google]({google_link})")
-    st.sidebar.markdown(f"[⚫ Sign in with GitHub]({github_link})")
+    github_link = (
+        f"https://github.com/login/oauth/authorize?client_id={st.secrets['GITHUB_CLIENT_ID']}"
+        f"&redirect_uri=https://lazyapply.streamlit.app/oauth2callback"
+        f"&scope=read:user user:email&state=login"
+    )
+
+    st.sidebar.markdown(f"[🔐 Login with Google]({google_link})", unsafe_allow_html=True)
+    st.sidebar.markdown(f"[💻 Login with GitHub]({github_link})", unsafe_allow_html=True)
+
 
 # -------------------- AUTH CHECK --------------------
 handle_oauth_callback()
