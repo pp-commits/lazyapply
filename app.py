@@ -69,7 +69,7 @@ def handle_oauth_callback():
             st.error("Unknown OAuth provider.")
             return
 
-        redirect_uri = st.request.url.split("?")[0]
+        redirect_uri = "https://lazyapply.streamlit.app"
         data = {
             "client_id": client_id,
             "client_secret": client_secret,
