@@ -10,13 +10,10 @@ cookie:
   key: ${COOKIE_KEY}
   name: lazyapply_cookie
 
-
-
 oauth:
-  credentials:
-    google:
-      client_id: ${GOOGLE_CLIENT_ID}
-      client_secret: ${GOOGLE_CLIENT_SECRET}
-    github:
-      client_id: ${GITHUB_CLIENT_ID}
-      client_secret: ${GITHUB_CLIENT_SECRET}
+  google:
+    client_id: ${GOOGLE_CLIENT_ID}
+    client_secret: ${GOOGLE_CLIENT_SECRET}
+  github:
+    client_id: ${GITHUB_CLIENT_ID}
+    client_secret: ${GITHUB_CLIENT_SECRET}

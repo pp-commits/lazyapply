@@ -31,10 +31,15 @@ SUPPORTED_COMPANIES = {
 # -------------------- DB INIT --------------------
 conn = sqlite3.connect("users.db")
 c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS users (
+c.execute('''
+CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
-    password TEXT
-)''')
+    name TEXT,
+    email TEXT,
+    source TEXT,  -- e.g., "google", "github", or "manual"
+    password TEXT  -- will be NULL for OAuth users
+)
+''')
 conn.commit()
 
 # -------------------- SESSION SETUP --------------------
@@ -55,22 +60,25 @@ def generate_docx(text):
 
 # -------------------- AUTH CONFIG --------------------
 # Load config.yaml
+
 with open("config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
 
 # Inject secrets
-config["oauth"]["credentials"]["google"]["client_id"] = st.secrets["GOOGLE_CLIENT_ID"]
-config["oauth"]["credentials"]["google"]["client_secret"] = st.secrets["GOOGLE_CLIENT_SECRET"]
-config["oauth"]["credentials"]["github"]["client_id"] = st.secrets["GITHUB_CLIENT_ID"]
-config["oauth"]["credentials"]["github"]["client_secret"] = st.secrets["GITHUB_CLIENT_SECRET"]
+config["cookie"]["key"] = st.secrets["COOKIE_KEY"]
+config["oauth"]["google"]["client_id"] = st.secrets["GOOGLE_CLIENT_ID"]
+config["oauth"]["google"]["client_secret"] = st.secrets["GOOGLE_CLIENT_SECRET"]
+config["oauth"]["github"]["client_id"] = st.secrets["GITHUB_CLIENT_ID"]
+config["oauth"]["github"]["client_secret"] = st.secrets["GITHUB_CLIENT_SECRET"]
 
 authenticator = stauth.Authenticate(
     credentials=config["credentials"],
     cookie_name=config["cookie"]["name"],
     key=config["cookie"]["key"],
     expiry_days=config["cookie"]["expiry_days"],
-    oauth_credentials=config["oauth"]["credentials"]
+    oauth_credentials=config["oauth"]
 )
+
 
 login_info = authenticator.login(location="sidebar")
 
@@ -83,15 +91,24 @@ else:
     auth_status = None
 
 # Handle login states
-if auth_status is False:
-    st.sidebar.error("❌ Invalid credentials")
-elif auth_status is None:
-    st.sidebar.info("Please log in to access full features.")
-elif auth_status:
+if auth_status:
     st.session_state.logged_in = True
     st.session_state.username = username
-    st.sidebar.success(f"👋 Welcome, {username}")
-    authenticator.logout("Logout", "sidebar")
+    st.session_state.name = name
+    st.sidebar.success(f"👋 Welcome, {name}")
+
+    # Insert OAuth user into DB if not exists
+    c.execute("SELECT * FROM users WHERE username = ?", (username,))
+    if not c.fetchone():
+        email = config["credentials"]["usernames"].get(username, {}).get("email", "unknown")
+        c.execute('''
+            INSERT INTO users (username, name, email, source, password)
+            VALUES (?, ?, ?, ?, NULL)
+        ''', (username, name, email, "oauth"))
+        conn.commit()
+
+    authenticator.logout("Logout", location="sidebar")
+
 
 
 
