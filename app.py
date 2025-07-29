@@ -1,24 +1,13 @@
 import streamlit as st
-import requests
-import time
-import re
 import sqlite3
+from utils.resume_parser import parse_resume
+from utils.matcher import get_custom_prompt_feedback, get_match_feedback
+from utils.job_scraper.common import fetch_greenhouse_jobs
+from utils.history import save_match
 from io import BytesIO
 from docx import Document
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
-
-from utils.resume_parser import parse_resume
-from utils.matcher import (
-    get_match_feedback,
-    get_batched_match_feedback,
-    get_custom_prompt_feedback,
-    extract_score
-)
-from utils.prompt_templates import build_prompt
-from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
-from utils.history import save_match, get_history
+import requests
+import base64
 
 # -------------------- CONFIG --------------------
 SUPPORTED_COMPANIES = {
@@ -29,24 +18,25 @@ SUPPORTED_COMPANIES = {
 }
 
 # -------------------- DB INIT --------------------
-conn = sqlite3.connect("users.db")
+conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''
 CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
     name TEXT,
     email TEXT,
-    source TEXT,  -- e.g., "google", "github", or "manual"
-    password TEXT  -- will be NULL for OAuth users
+    source TEXT
 )
 ''')
 conn.commit()
 
-# -------------------- SESSION SETUP --------------------
+# -------------------- SESSION INIT --------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
-    st.session_state.username = ""
+    st.session_state.username = None
+if "name" not in st.session_state:
+    st.session_state.name = None
 
 # -------------------- DOCX HELPER --------------------
 def generate_docx(text):
@@ -58,55 +48,97 @@ def generate_docx(text):
     buffer.seek(0)
     return buffer
 
-# -------------------- AUTH CONFIG --------------------
-# Load config.yaml
+# -------------------- OAUTH CALLBACK HANDLER --------------------
+def handle_oauth_callback():
+    params = st.query_params
+    provider = params.get("provider", [None])[0]
+    code = params.get("code", [None])[0]
 
-with open("config.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader)
+    if provider and code:
+        if provider == "google":
+            client_id = st.secrets["GOOGLE_CLIENT_ID"]
+            client_secret = st.secrets["GOOGLE_CLIENT_SECRET"]
+            token_url = "https://oauth2.googleapis.com/token"
+            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+        elif provider == "github":
+            client_id = st.secrets["GITHUB_CLIENT_ID"]
+            client_secret = st.secrets["GITHUB_CLIENT_SECRET"]
+            token_url = "https://github.com/login/oauth/access_token"
+            userinfo_url = "https://api.github.com/user"
+        else:
+            st.error("Unknown OAuth provider.")
+            return
 
-# Inject secrets
-config["cookie"]["key"] = st.secrets["COOKIE_KEY"]
-config["oauth"]["google"]["client_id"] = st.secrets["GOOGLE_CLIENT_ID"]
-config["oauth"]["google"]["client_secret"] = st.secrets["GOOGLE_CLIENT_SECRET"]
-config["oauth"]["github"]["client_id"] = st.secrets["GITHUB_CLIENT_ID"]
-config["oauth"]["github"]["client_secret"] = st.secrets["GITHUB_CLIENT_SECRET"]
+        redirect_uri = st.request.url.split("?")[0]
+        data = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code"
+        }
+        headers = {"Accept": "application/json"}
+        response = requests.post(token_url, data=data, headers=headers)
+        token_data = response.json()
+        access_token = token_data.get("access_token")
 
-authenticator = stauth.Authenticate(
-    credentials=config["credentials"],
-    cookie_name=config["cookie"]["name"],
-    key=config["cookie"]["key"],
-    expiry_days=config["cookie"]["expiry_days"],
-    oauth_credentials=config["oauth"]
-)
+        if not access_token:
+            st.error("OAuth failed. Could not retrieve access token.")
+            return
 
-login_info = authenticator.login(location="sidebar")
+        userinfo = requests.get(userinfo_url, headers={"Authorization": f"Bearer {access_token}"}).json()
 
-if login_info:
-    name = login_info["name"]
-    username = login_info["username"]
-    auth_status = login_info["authenticated"]
+        if provider == "google":
+            username = userinfo.get("email")
+            name = userinfo.get("name")
+        else:
+            username = str(userinfo.get("id"))
+            name = userinfo.get("login")
+
+        st.session_state.logged_in = True
+        st.session_state.username = username
+        st.session_state.name = name
+
+        c.execute("SELECT * FROM users WHERE username = ?", (username,))
+        if not c.fetchone():
+            c.execute("INSERT INTO users (username, name, email, source) VALUES (?, ?, ?, ?)",
+                      (username, name, username, provider))
+            conn.commit()
+
+        st.success(f"✅ Logged in as {name}")
+        st.rerun()
+
+# -------------------- AUTH UI --------------------
+def login_ui():
+    st.sidebar.markdown("### 🔐 Login or Sign Up")
+
+    google_link = (
+        f"https://accounts.google.com/o/oauth2/v2/auth?client_id={st.secrets['GOOGLE_CLIENT_ID']}"
+        f"&response_type=code&scope=openid%20email%20profile"
+        f"&redirect_uri={st.request.url}&state=login&access_type=offline&prompt=consent"
+        f"&provider=google"
+    )
+    github_link = (
+        f"https://github.com/login/oauth/authorize?client_id={st.secrets['GITHUB_CLIENT_ID']}"
+        f"&redirect_uri={st.request.url}&scope=read:user%20user:email&state=login&provider=github"
+    )
+
+    st.sidebar.markdown(f"[🔵 Sign in with Google]({google_link})")
+    st.sidebar.markdown(f"[⚫ Sign in with GitHub]({github_link})")
+
+# -------------------- AUTH CHECK --------------------
+handle_oauth_callback()
+
+if not st.session_state.logged_in:
+    login_ui()
 else:
-    name = username = None
-    auth_status = None
+    st.sidebar.markdown(f"👋 Welcome, **{st.session_state.name}**")
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
 
-# Handle login states
-if auth_status:
-    st.session_state.logged_in = True
-    st.session_state.username = username
-    st.session_state.name = name
-    st.sidebar.success(f"👋 Welcome, {name}")
-
-    # Insert OAuth user into DB if not exists
-    c.execute("SELECT * FROM users WHERE username = ?", (username,))
-    if not c.fetchone():
-        email = config["credentials"]["usernames"].get(username, {}).get("email", "unknown")
-        c.execute('''
-            INSERT INTO users (username, name, email, source, password)
-            VALUES (?, ?, ?, ?, NULL)
-        ''', (username, name, email, "oauth"))
-        conn.commit()
-
-    authenticator.logout("Logout", location="sidebar")
+# -------------------- PAGE CONFIG --------------------
+st.set_page_config(page_title="LazyApply AI", layout="centered")
 
 # -------------------- CACHE JOBS --------------------
 if "job_cache" not in st.session_state:
@@ -116,90 +148,17 @@ if "job_cache" not in st.session_state:
         all_jobs[comp_name] = jobs
     st.session_state["job_cache"] = all_jobs
 
-# -------------------- STYLING --------------------
-st.set_page_config(page_title="LazyApply AI", layout="centered")
+# -------------------- UI --------------------
+st.title("🤖 LazyApply AI")
+st.caption("Your Job Buddy for the Resume Revolution 🚀")
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-        background-color: var(--background-color);
-        color: var(--text-color);
-    }
-    h1, h2, h3 {
-        font-weight: 600;
-        color: var(--text-color);
-    }
-    .stButton button {
-        background: linear-gradient(90deg, var(--primary-color), #5e5eea);
-        border: none;
-        color: white;
-        font-weight: 600;
-        border-radius: 12px;
-        padding: 8px 16px;
-        box-shadow: 0 0 8px rgba(75, 222, 145, 0.3);
-        transition: all 0.3s ease-in-out;
-    }
-    .stButton button:hover {
-        filter: brightness(1.05);
-        box-shadow: 0 0 12px rgba(94, 94, 234, 0.5);
-    }
-    .stDownloadButton button {
-        background: #222;
-        color: white;
-        border-radius: 12px;
-        font-weight: bold;
-    }
-    .stDownloadButton button:hover {
-        background: #000;
-    }
-    .stTextInput>div>div>input,
-    .stTextArea textarea {
-        background-color: var(--background-color);
-        color: var(--text-color);
-        border-radius: 10px;
-        border: 1px solid #dce6f7;
-        padding: 10px;
-    }
-    .stRadio>div>label {
-        font-weight: 500;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<h1 style='
-    text-align: center;
-    font-family: "Poppins", sans-serif;
-    font-weight: 600;
-    font-size: 2.5rem;
-    margin-top: 10px;
-    color: var(--text-color);
-'>
-🤖 LazyApply AI
-</h1>
-<p style='
-    text-align: center;
-    font-size: 1rem;
-    color: var(--text-color);
-    opacity: 0.6;
-    margin-top: -12px;
-'>
-Your Job Buddy for the Resume Revolution 🚀
-</p>
-""", unsafe_allow_html=True)
-
-# -------------------- MAIN UI --------------------
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 with tab1:
-    st.markdown("Upload your resume and paste a job description to get tailored AI feedback.") 
-    st.markdown("💡 Tip: Use your favorite job post!")
-    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"], help="Only used locally. Never leaves your browser.")
-    jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
+    uploaded_file = st.file_uploader("📄 Upload your resume", type=["pdf", "docx"])
+    jd_text = st.text_area("💼 Paste job description")
 
-    mode = st.selectbox("🧠 Choose AI Analysis Mode", [
+    mode = st.selectbox("AI Mode", [
         "Brutal Resume Review",
         "Rewrite to Sound Results-Driven",
         "Optimize for ATS",
@@ -211,78 +170,34 @@ with tab1:
         "Full Resume Intelligence Report"
     ])
 
-    section = st.selectbox("🔹 Focus on a specific resume section?", [
+    section = st.selectbox("Focus section", [
         "Entire Resume", "Professional Summary", "Experience", "Education", "Projects"
     ]) if mode == "Rewrite to Sound Results-Driven" else "Entire Resume"
 
-    model_choice = st.radio("Choose model:", ["Exaone (Deep & Accurate)", "Mistral (Fast & Light)"], index=0, horizontal=True)
-    chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
+    model = st.radio("Model", ["Exaone", "Mistral"], horizontal=True)
+    chosen_model = "lgai/exaone-3-5-32b-instruct" if model == "Exaone" else "mistralai/Mistral-7B-Instruct-v0.2"
 
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
-    submitted = st.button("🚀 Generate Feedback", help="Click once both resume and JD are ready")
-
-    if submitted and resume_text and resume_text.strip() and jd_text.strip():
-        key_hash = hash(resume_text + jd_text + mode + section + chosen_model)
-
-        if st.session_state.get("input_hash") != key_hash:
-            with st.spinner("🔬 Processing your resume..."):
-                if mode == "Tailor Resume for Job Description" and not jd_text:
-                    st.warning("This mode works best with a job description pasted above.")
-
-                result, score = get_custom_prompt_feedback(
-                    resume_text=resume_text,
-                    jd_text=jd_text,
-                    mode=mode,
-                    section=section,
-                    model=chosen_model
-                )
-                st.session_state["input_hash"] = key_hash
-                st.session_state["feedback"] = str(result)
-                st.session_state["copied"] = False
-
-                save_match(resume_text, jd_text, result)
-        else:
-            result = st.session_state["feedback"]
-
-        result = str(result) if result else "⚠️ No result generated."
+    if st.button("🚀 Generate Feedback") and resume_text and jd_text:
+        result, score = get_custom_prompt_feedback(
+            resume_text=resume_text,
+            jd_text=jd_text,
+            mode=mode,
+            section=section,
+            model=chosen_model
+        )
+        save_match(resume_text, jd_text, result)
         st.text_area("📊 AI Feedback", result, height=300)
 
-    elif submitted:
-        if not uploaded_file and not jd_text.strip():
-            st.info("Upload your resume and paste a job description to begin.")
-        elif not uploaded_file:
-            st.warning("Please upload your resume.")
-        elif not jd_text.strip():
-            st.warning("Please paste a job description.")
-
 with tab2:
-    st.markdown("🧠 Select a company and search job roles:")
-    selected_company = st.selectbox("🏢 Choose a company", list(SUPPORTED_COMPANIES.keys()))
-    company_slug = SUPPORTED_COMPANIES[selected_company]
-    keyword = st.text_input("🔍 Search by keyword", value="engineering")
-
+    company = st.selectbox("🏢 Company", list(SUPPORTED_COMPANIES.keys()))
+    keyword = st.text_input("🔍 Role Keyword", value="engineering")
     if keyword:
-        jobs = fetch_greenhouse_jobs(company_slug, limit=10, keyword=keyword)
-        if isinstance(jobs, str):
-            st.error(jobs)
-        elif not jobs:
-            st.warning("No roles found for this keyword.")
-        else:
-            for job in jobs:
-                with st.expander(f"🔧 {job['title']} – {job['location']}"):
-                    st.markdown(f"**Company**: {selected_company}")
-                    st.markdown(f"**Location**: {job['location']}")
-                    st.markdown(f"**Link**: [Apply Here]({job['link']})")
-
-                    if uploaded_file:
-                        unique_key = f"{job['title']}_{job['link'].split('/')[-1]}"
-                        if st.button(f"⚡ Match My Resume with {job['title']}", key=unique_key):
-                            resume_text = parse_resume(uploaded_file)
-                            with st.spinner("Matching in progress..."):
-                                feedback = get_match_feedback(resume_text, job['summary'])
-                            st.success("✅ Match completed!")
-                            st.text_area("📊 Feedback", feedback if isinstance(feedback, str) else feedback[0], height=300)
-                    else:
-                        st.info("Upload resume in Tab 1 to enable matching.")
-    else:
-        st.info("Please enter a keyword to search job roles.")
+        jobs = fetch_greenhouse_jobs(SUPPORTED_COMPANIES[company], limit=10, keyword=keyword)
+        for job in jobs:
+            with st.expander(f"🔧 {job['title']} – {job['location']}"):
+                st.markdown(f"**Link**: [Apply Here]({job['link']})")
+                if uploaded_file:
+                    if st.button(f"⚡ Match with {job['title']}", key=job['link']):
+                        feedback = get_match_feedback(parse_resume(uploaded_file), job['summary'])
+                        st.text_area("📊 Feedback", feedback, height=300)
