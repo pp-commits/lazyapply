@@ -63,7 +63,6 @@ config["oauth"]["providers"]["google"]["client_id"] = st.secrets["GOOGLE_CLIENT_
 config["oauth"]["providers"]["google"]["client_secret"] = st.secrets["GOOGLE_CLIENT_SECRET"]
 config["oauth"]["providers"]["github"]["client_id"] = st.secrets["GITHUB_CLIENT_ID"]
 config["oauth"]["providers"]["github"]["client_secret"] = st.secrets["GITHUB_CLIENT_SECRET"]
-config["cookie"]["key"] = st.secrets["lazyapply_signature"]
 
 authenticator = stauth.Authenticate(
     config["credentials"],
