@@ -73,7 +73,16 @@ authenticator = stauth.Authenticate(
 )
 
 # Show login widget in sidebar
-name, auth_status, username = authenticator.login(location="sidebar")
+login_info = authenticator.login(location="sidebar")
+
+if login_info:
+    name = login_info["name"]
+    auth_status = login_info["authenticated"]
+    username = login_info["username"]
+else:
+    name = username = None
+    auth_status = None
+
 
 # Handle login states
 if auth_status is False:
