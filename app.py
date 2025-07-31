@@ -170,15 +170,14 @@ if "job_cache" not in st.session_state:
 
 # -------------------- MAIN UI --------------------
 st.caption("Your Job Buddy for the Resume Revolution 🚀")
+
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 with tab1:
-    st.markdown("Upload your resume and paste a job description to get tailored AI feedback.") 
-    st.markdown("💡 Tip: Use your favorite job post!")
-    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"], help="Only used locally. Never leaves your browser.")
-    jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
+    uploaded_file = st.file_uploader("📄 Upload your resume", type=["pdf", "docx"])
+    jd_text = st.text_area("💼 Paste job description")
 
-    mode = st.selectbox("🧠 Choose AI Analysis Mode", [
+    mode = st.selectbox("AI Mode", [
         "Brutal Resume Review",
         "Rewrite to Sound Results-Driven",
         "Optimize for ATS",
@@ -190,78 +189,34 @@ with tab1:
         "Full Resume Intelligence Report"
     ])
 
-    section = st.selectbox("🔹 Focus on a specific resume section?", [
+    section = st.selectbox("Focus section", [
         "Entire Resume", "Professional Summary", "Experience", "Education", "Projects"
     ]) if mode == "Rewrite to Sound Results-Driven" else "Entire Resume"
 
-    model_choice = st.radio("Choose model:", ["Exaone (Deep & Accurate)", "Mistral (Fast & Light)"], index=0, horizontal=True)
-    chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
+    model = st.radio("Model", ["Exaone", "Mistral"], horizontal=True)
+    chosen_model = "lgai/exaone-3-5-32b-instruct" if model == "Exaone" else "mistralai/Mistral-7B-Instruct-v0.2"
 
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
-    submitted = st.button("🚀 Generate Feedback", help="Click once both resume and JD are ready")
-
-    if submitted and resume_text and resume_text.strip() and jd_text.strip():
-        key_hash = hash(resume_text + jd_text + mode + section + chosen_model)
-
-        if st.session_state.get("input_hash") != key_hash:
-            with st.spinner("🔬 Processing your resume..."):
-                if mode == "Tailor Resume for Job Description" and not jd_text:
-                    st.warning("This mode works best with a job description pasted above.")
-
-                result, score = get_custom_prompt_feedback(
-                    resume_text=resume_text,
-                    jd_text=jd_text,
-                    mode=mode,
-                    section=section,
-                    model=chosen_model
-                )
-                st.session_state["input_hash"] = key_hash
-                st.session_state["feedback"] = str(result)
-                st.session_state["copied"] = False
-
-                save_match(resume_text, jd_text, result)
-        else:
-            result = st.session_state["feedback"]
-
-        result = str(result) if result else "⚠️ No result generated."
+    if st.button("🚀 Generate Feedback") and resume_text and jd_text:
+        result, score = get_custom_prompt_feedback(
+            resume_text=resume_text,
+            jd_text=jd_text,
+            mode=mode,
+            section=section,
+            model=chosen_model
+        )
+        save_match(resume_text, jd_text, result)
         st.text_area("📊 AI Feedback", result, height=300)
 
-    elif submitted:
-        if not uploaded_file and not jd_text.strip():
-            st.info("Upload your resume and paste a job description to begin.")
-        elif not uploaded_file:
-            st.warning("Please upload your resume.")
-        elif not jd_text.strip():
-            st.warning("Please paste a job description.")
-
 with tab2:
-    st.markdown("🧠 Select a company and search job roles:")
-    selected_company = st.selectbox("🏢 Choose a company", list(SUPPORTED_COMPANIES.keys()))
-    company_slug = SUPPORTED_COMPANIES[selected_company]
-    keyword = st.text_input("🔍 Search by keyword", value="engineering")
-
+    company = st.selectbox("🏢 Company", list(SUPPORTED_COMPANIES.keys()))
+    keyword = st.text_input("🔍 Role Keyword", value="engineering")
     if keyword:
-        jobs = fetch_greenhouse_jobs(company_slug, limit=10, keyword=keyword)
-        if isinstance(jobs, str):
-            st.error(jobs)
-        elif not jobs:
-            st.warning("No roles found for this keyword.")
-        else:
-            for job in jobs:
-                with st.expander(f"🔧 {job['title']} – {job['location']}"):
-                    st.markdown(f"**Company**: {selected_company}")
-                    st.markdown(f"**Location**: {job['location']}")
-                    st.markdown(f"**Link**: [Apply Here]({job['link']})")
-
-                    if uploaded_file:
-                        unique_key = f"{job['title']}_{job['link'].split('/')[-1]}"
-                        if st.button(f"⚡ Match My Resume with {job['title']}", key=unique_key):
-                            resume_text = parse_resume(uploaded_file)
-                            with st.spinner("Matching in progress..."):
-                                feedback = get_match_feedback(resume_text, job['summary'])
-                            st.success("✅ Match completed!")
-                            st.text_area("📊 Feedback", feedback if isinstance(feedback, str) else feedback[0], height=300)
-                    else:
-                        st.info("Upload resume in Tab 1 to enable matching.")
-    else:
-        st.info("Please enter a keyword to search job roles.")
+        jobs = fetch_greenhouse_jobs(SUPPORTED_COMPANIES[company], limit=10, keyword=keyword)
+        for job in jobs:
+            with st.expander(f"🔧 {job['title']} – {job['location']}"):
+                st.markdown(f"**Link**: [Apply Here]({job['link']})")
+                if uploaded_file:
+                    if st.button(f"⚡ Match with {job['title']}", key=job['link']):
+                        feedback = get_match_feedback(parse_resume(uploaded_file), job['summary'])
+                        st.text_area("📊 Feedback", feedback, height=300)
