@@ -142,16 +142,8 @@ else:
     if st.sidebar.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
-# -------------------- LOGOUT HANDLER --------------------
-if st.session_state.logged_in and st.query_params.get("logout"):
-    st.session_state.clear()
-    st.rerun()
 
-# -------------------- AUTH BLOCK --------------------
-if not st.session_state.logged_in:
-    login_ui()
-    st.stop()
-
+        
 # -------------------- CACHE JOBS --------------------
 if "job_cache" not in st.session_state:
     all_jobs = {}
@@ -223,9 +215,6 @@ st.markdown("""
 '>
 🤖 LazyApply AI
 </h1>
-            <form method='post'>
-                <button type='submit' name='logout' ...>Logout</button>
-            </form>
 <p style='
     text-align: center;
     font-size: 1rem;
