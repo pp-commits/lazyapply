@@ -1,20 +1,13 @@
 import streamlit as st
-import requests
-import time
-import re
 import sqlite3
+from utils.resume_parser import parse_resume
+from utils.matcher import get_custom_prompt_feedback, get_match_feedback
+from utils.job_scraper.common import fetch_greenhouse_jobs
+from utils.history import save_match
 from io import BytesIO
 from docx import Document
-from utils.resume_parser import parse_resume
-from utils.matcher import (
-    get_match_feedback,
-    get_batched_match_feedback,
-    get_custom_prompt_feedback,
-    extract_score
-)
-from utils.prompt_templates import build_prompt
-from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
-from utils.history import save_match, get_history
+import requests
+import base64
 
 # -------------------- CONFIG --------------------
 SUPPORTED_COMPANIES = {
@@ -123,89 +116,18 @@ def login_ui():
         f"https://accounts.google.com/o/oauth2/v2/auth?client_id={st.secrets['GOOGLE_CLIENT_ID']}"
         f"&response_type=code&scope=openid%20email%20profile"
         f"&redirect_uri=https://lazyapply.streamlit.app/oauth2callback"
-        f"&state=login&access_type=offline&prompt=consent&provider=google"
+        f"&state=login&access_type=offline&prompt=consent"
     )
 
-
-    
-
     st.sidebar.markdown(f"[🔐 Login with Google]({google_link})", unsafe_allow_html=True)
-    #st.sidebar.markdown(f"[💻 Login with GitHub]({github_link})", unsafe_allow_html=True)
 
 # -------------------- AUTH CHECK --------------------
 handle_oauth_callback()
 
-if not st.session_state.logged_in:
-    login_ui()
-else:
-    st.sidebar.markdown(f"👋 Welcome, **{st.session_state.name}**")
-    if st.sidebar.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
-# -------ssion_state.clear()
-    st.rerun()
-
-        
-# -------------------- CACHE JOBS --------------------
-if "job_cache" not in st.session_state:
-    all_jobs = {}
-    for comp_name, slug in SUPPORTED_COMPANIES.items():
-        jobs = fetch_greenhouse_jobs(slug, limit=3, keyword="engineering")
-        all_jobs[comp_name] = jobs
-    st.session_state["job_cache"] = all_jobs
-
-# -------------------- STYLING --------------------
+# -------------------- PAGE CONFIG --------------------
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-        background-color: var(--background-color);
-        color: var(--text-color);
-    }
-    h1, h2, h3 {
-        font-weight: 600;
-        color: var(--text-color);
-    }
-    .stButton button {
-        background: linear-gradient(90deg, var(--primary-color), #5e5eea);
-        border: none;
-        color: white;
-        font-weight: 600;
-        border-radius: 12px;
-        padding: 8px 16px;
-        box-shadow: 0 0 8px rgba(75, 222, 145, 0.3);
-        transition: all 0.3s ease-in-out;
-    }
-    .stButton button:hover {
-        filter: brightness(1.05);
-        box-shadow: 0 0 12px rgba(94, 94, 234, 0.5);
-    }
-    .stDownloadButton button {
-        background: #222;
-        color: white;
-        border-radius: 12px;
-        font-weight: bold;
-    }
-    .stDownloadButton button:hover {
-        background: #000;
-    }
-    .stTextInput>div>div>input,
-    .stTextArea textarea {
-        background-color: var(--background-color);
-        color: var(--text-color);
-        border-radius: 10px;
-        border: 1px solid #dce6f7;
-        padding: 10px;
-    }
-    .stRadio>div>label {
-        font-weight: 500;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
+# -------------------- UI HEADER --------------------
 st.markdown("""
 <h1 style='
     text-align: center;
@@ -228,7 +150,26 @@ Your Job Buddy for the Resume Revolution 🚀
 </p>
 """, unsafe_allow_html=True)
 
+# -------------------- LOGOUT HANDLER --------------------
+if st.session_state.logged_in and st.query_params.get("logout"):
+    st.session_state.clear()
+    st.rerun()
+
+# -------------------- AUTH BLOCK --------------------
+if not st.session_state.logged_in:
+    login_ui()
+    st.stop()
+
+# -------------------- CACHE JOBS --------------------
+if "job_cache" not in st.session_state:
+    all_jobs = {}
+    for comp_name, slug in SUPPORTED_COMPANIES.items():
+        jobs = fetch_greenhouse_jobs(slug, limit=3, keyword="engineering")
+        all_jobs[comp_name] = jobs
+    st.session_state["job_cache"] = all_jobs
+
 # -------------------- MAIN UI --------------------
+st.caption("Your Job Buddy for the Resume Revolution 🚀")
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 with tab1:
