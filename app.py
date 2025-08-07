@@ -77,38 +77,25 @@ def login_ui():
 
             df = pd.read_csv("users.csv")
             if email not in df["email"].values:
-                df = df.append({"email": email, "name": st.session_state.name}, ignore_index=True)
+                df.loc[len(df)] = [email, st.session_state.name]
                 df.to_csv("users.csv", index=False)
 
             st.success(f"✅ Logged in as {st.session_state.name}")
             st.rerun()
 
-# -------------------- AUTH CHECK --------------------
-if not st.session_state.logged_in:
-    login_ui()
-    st.stop()
-
 # -------------------- PAGE CONFIG --------------------
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 
 # -------------------- LOGOUT UI --------------------
-st.sidebar.markdown(f"👋 Welcome, **{st.session_state.name}**")
-if st.sidebar.button("🚪 Logout"):
-    st.session_state.clear()
-    st.rerun()
-
-        
-# -------------------- CACHE JOBS --------------------
-if "job_cache" not in st.session_state:
-    all_jobs = {}
-    for comp_name, slug in SUPPORTED_COMPANIES.items():
-        jobs = fetch_greenhouse_jobs(slug, limit=3, keyword="engineering")
-        all_jobs[comp_name] = jobs
-    st.session_state["job_cache"] = all_jobs
+if st.session_state.logged_in:
+    st.sidebar.markdown(f"👋 Welcome, **{st.session_state.name}**")
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
+else:
+    login_ui()
 
 # -------------------- STYLING --------------------
-st.set_page_config(page_title="LazyApply AI", layout="centered")
-
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
@@ -180,7 +167,7 @@ Your Job Buddy for the Resume Revolution 🚀
 </p>
 """, unsafe_allow_html=True)
 
-# -------------------- MAIN UI --------------------
+# -------------------- TABS --------------------
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 with tab1:
@@ -216,9 +203,6 @@ with tab1:
 
         if st.session_state.get("input_hash") != key_hash:
             with st.spinner("🔬 Processing your resume..."):
-                if mode == "Tailor Resume for Job Description" and not jd_text:
-                    st.warning("This mode works best with a job description pasted above.")
-
                 result, score = get_custom_prompt_feedback(
                     resume_text=resume_text,
                     jd_text=jd_text,
