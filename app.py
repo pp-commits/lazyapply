@@ -239,35 +239,46 @@ with tab1:
             st.warning("Please paste a job description.")
 
 with tab2:
-    st.subheader(" Explore Jobs")
+    st.markdown("🧠 Browse and filter jobs from multiple companies:")
 
-    # Filters
+    # Company filter (multi-select)
     selected_companies = st.multiselect(
-        "🏢 Filter by Company",
+        "🏢 Choose companies",
         options=list(SUPPORTED_COMPANIES.keys()),
         default=list(SUPPORTED_COMPANIES.keys())
     )
-    keyword = st.text_input("🔍 Role Keyword", value="", placeholder="e.g., engineering, data, backend...")
 
-    # Load all jobs from cache
-    all_jobs = []
+    # Keyword filter
+    keyword = st.text_input("🔍 Search by keyword", value="", placeholder="e.g., engineering, backend, data...").strip()
+
+    # Collect matching jobs
+    filtered_jobs = []
     for comp_name in selected_companies:
         jobs = st.session_state["job_cache"].get(comp_name, [])
         for job in jobs:
             if not keyword or keyword.lower() in job['title'].lower():
-                job_entry = job.copy()
-                job_entry["company"] = comp_name
-                all_jobs.append(job_entry)
+                filtered_jobs.append({**job, "company": comp_name})
 
-    if not all_jobs:
-        st.info("No jobs found for the selected filters.")
+    if not filtered_jobs:
+        st.warning("No jobs found for the selected filters.")
     else:
-        for job in all_jobs:
+        for job in filtered_jobs:
             with st.expander(f"🔧 {job['title']} – {job['location']} ({job['company']})"):
                 st.markdown(f"**Company**: {job['company']}")
+                st.markdown(f"**Location**: {job['location']}")
                 st.markdown(f"**Link**: [Apply Here]({job['link']})")
-                st.markdown(f"**Summary**: {job['summary']}")
+
                 if uploaded_file:
-                    if st.button(f"⚡ Match with {job['title']} at {job['company']}", key=job['link']):
-                        feedback = get_match_feedback(parse_resume(uploaded_file), job['summary'])
-                        st.text_area("📊 Feedback", feedback, height=300)
+                    unique_key = f"{job['title']}_{job['company']}_{job['link'].split('/')[-1]}"
+                    if st.button(f"⚡ Match My Resume with {job['title']} ({job['company']})", key=unique_key):
+                        resume_text = parse_resume(uploaded_file)
+                        with st.spinner("Matching in progress..."):
+                            feedback = get_match_feedback(resume_text, job['summary'])
+                        st.success("✅ Match completed!")
+                        st.text_area(
+                            "📊 Feedback",
+                            feedback if isinstance(feedback, str) else feedback[0],
+                            height=300
+                        )
+                else:
+                    st.info("Upload resume in Tab 1 to enable matching.")
