@@ -105,8 +105,6 @@ if "job_cache" not in st.session_state:
     st.session_state["job_cache"] = all_jobs
 
 # -------------------- STYLING --------------------
-st.set_page_config(page_title="LazyApply AI", layout="centered")
-
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
@@ -178,7 +176,7 @@ Your Job Buddy for the Resume Revolution 🚀
 </p>
 """, unsafe_allow_html=True)
 
-# -------------------- MAIN UI --------------------
+# -------------------- TABS --------------------
 tab1, tab2 = st.tabs(["📄 Match Resume", "𞳻 Explore Jobs"])
 
 with tab1:
@@ -214,9 +212,6 @@ with tab1:
 
         if st.session_state.get("input_hash") != key_hash:
             with st.spinner("🔬 Processing your resume..."):
-                if mode == "Tailor Resume for Job Description" and not jd_text:
-                    st.warning("This mode works best with a job description pasted above.")
-
                 result, score = get_custom_prompt_feedback(
                     resume_text=resume_text,
                     jd_text=jd_text,
