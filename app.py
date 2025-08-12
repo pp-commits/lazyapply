@@ -24,23 +24,22 @@ SUPPORTED_COMPANIES = {
 }
 
 # -------------------- DB INIT --------------------
-conn = sqlite3.connect("users.db", check_same_thread=False)
-c = conn.cursor()
-c.execute('''
-CREATE TABLE IF NOT EXISTS users (
-    email TEXT PRIMARY KEY,
-    name TEXT
-)
-''')
-conn.commit()
+#conn = sqlite3.connect("users.db", check_same_thread=False)
+#c = conn.cursor()
+#c.execute('''
+#CREATE TABLE IF NOT EXISTS users (
+ #   email TEXT PRIMARY KEY,
+ #   name TEXT
+#)
+#''')
+#conn.commit()
 
 # -------------------- SESSION INIT --------------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "email" not in st.session_state:
-    st.session_state.email = ""
-if "name" not in st.session_state:
-    st.session_state.name = ""
+#if "logged_in" not in st.session_state:
+ ##if "email" not in st.session_state:
+   # st.session_state.email = ""
+#if "name" not in st.session_state:
+#    st.session_state.name = ""
 
 # -------------------- DOCX HELPER --------------------
 def generate_docx(text):
@@ -53,47 +52,46 @@ def generate_docx(text):
     return buffer
 
 # -------------------- LOGIN UI --------------------
-def login_ui():
-    st.sidebar.markdown("### 🔐 Login")
-    with st.sidebar.form("login_form"):
-        email = st.text_input("📧 Email")
-        name = st.text_input("👤 Name")
-        submitted = st.form_submit_button("Login")
+#def login_ui():
+ #   st.sidebar.markdown("### 🔐 Login")
+ #   with st.sidebar.form("login_form"):
+  #      email = st.text_input("📧 Email")
+   #     name = st.text_input("👤 Name")
+    #    submitted = st.form_submit_button("Login")
 
-        if submitted and email:
-            st.session_state.logged_in = True
-            st.session_state.email = email
-            st.session_state.name = name if name else "Guest"
+     #   if submitted and email:
+      #      st.session_state.logged_in = True
+       #     st.session_state.email = email
+        #    st.session_state.name = name if name else "Guest"
 
             # Save to DB if not exists
-            c.execute("SELECT * FROM users WHERE email = ?", (email,))
-            if not c.fetchone():
-                c.execute("INSERT INTO users (email, name) VALUES (?, ?)", (email, st.session_state.name))
-                conn.commit()
+           # c.execute("SELECT * FROM users WHERE email = ?", (email,))
+         #   if not c.fetchone():
+          #      c.execute("INSERT INTO users (email, name) VALUES (?, ?)", (email, st.session_state.name))
+            #    conn.commit()
 
             # Also save to CSV for backup
-            if not os.path.exists("users.csv"):
-                pd.DataFrame(columns=["email", "name"]).to_csv("users.csv", index=False)
+            #if not os.path.exists("users.csv"):
+             #   pd.DataFrame(columns=["email", "name"]).to_csv("users.csv", index=False)
 
-            df = pd.read_csv("users.csv")
-            if email not in df["email"].values:
-                df.loc[len(df)] = [email, st.session_state.name]
-                df.to_csv("users.csv", index=False)
+            #df = pd.read_csv("users.csv")
+            #if email not in df["email"].values:
+             #   df.loc[len(df)] = [email, st.session_state.name]
+              #  df.to_csv("users.csv", index=False)
 
-            st.success(f"✅ Logged in as {st.session_state.name}")
-            st.rerun()
+            #st.success(f"✅ Logged in as {st.session_state.name}")
+            #st.rerun()
 
 # -------------------- PAGE CONFIG --------------------
 st.set_page_config(page_title="LazyApply AI", layout="centered")
 
 # -------------------- LOGOUT UI --------------------
-if st.session_state.logged_in:
-    st.sidebar.markdown(f"👋 Welcome, **{st.session_state.name}**")
-    if st.sidebar.button("🚪 Logout"):
-        st.session_state.clear()
-        st.rerun()
-else:
-    login_ui()
+#if st.session_state.logged_in:
+ #   st.sidebar.markdown(f"👋 Welcome, **{st.session_state.name}**")
+ ##      st.session_state.clear()
+   #     st.rerun()
+#else:
+ #   login_ui()
 
         
 # -------------------- CACHE JOBS --------------------
