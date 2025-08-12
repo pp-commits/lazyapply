@@ -1,7 +1,6 @@
 import streamlit as st
-import requests
-import time
-import re
+import pandas as pd
+import os
 import sqlite3
 from io import BytesIO
 from docx import Document
@@ -29,10 +28,8 @@ conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''
 CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    name TEXT,
-    email TEXT,
-    source TEXT
+    email TEXT PRIMARY KEY,
+    name TEXT
 )
 ''')
 conn.commit()
@@ -40,10 +37,10 @@ conn.commit()
 # -------------------- SESSION INIT --------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = None
+if "email" not in st.session_state:
+    st.session_state.email = ""
 if "name" not in st.session_state:
-    st.session_state.name = None
+    st.session_state.name = ""
 
 # -------------------- DOCX HELPER --------------------
 def generate_docx(text):
@@ -55,95 +52,48 @@ def generate_docx(text):
     buffer.seek(0)
     return buffer
 
-# -------------------- OAUTH CALLBACK HANDLER --------------------
-def handle_oauth_callback():
-    params = st.query_params
-    provider = params.get("provider", [None])[0]
-    code = params.get("code", [None])[0]
-
-    if provider and code:
-        if provider == "google":
-            client_id = st.secrets["GOOGLE_CLIENT_ID"]
-            client_secret = st.secrets["GOOGLE_CLIENT_SECRET"]
-            token_url = "https://oauth2.googleapis.com/token"
-            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-        elif provider == "github":
-            client_id = st.secrets["GITHUB_CLIENT_ID"]
-            client_secret = st.secrets["GITHUB_CLIENT_SECRET"]
-            token_url = "https://github.com/login/oauth/access_token"
-            userinfo_url = "https://api.github.com/user"
-        else:
-            st.error("Unknown OAuth provider.")
-            return
-
-        redirect_uri = "https://lazyapply.streamlit.app/oauth2callback"
-        data = {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "code": code,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code"
-        }
-        headers = {"Accept": "application/json"}
-        response = requests.post(token_url, data=data, headers=headers)
-        token_data = response.json()
-        access_token = token_data.get("access_token")
-
-        if not access_token:
-            st.error("OAuth failed. Could not retrieve access token.")
-            return
-
-        userinfo = requests.get(userinfo_url, headers={"Authorization": f"Bearer {access_token}"}).json()
-
-        if provider == "google":
-            username = userinfo.get("email")
-            name = userinfo.get("name")
-        else:
-            username = str(userinfo.get("id"))
-            name = userinfo.get("login")
-
-        st.session_state.logged_in = True
-        st.session_state.username = username
-        st.session_state.name = name
-
-        c.execute("SELECT * FROM users WHERE username = ?", (username,))
-        if not c.fetchone():
-            c.execute("INSERT INTO users (username, name, email, source) VALUES (?, ?, ?, ?)",
-                      (username, name, username, provider))
-            conn.commit()
-
-        st.success(f"✅ Logged in as {name}")
-        st.rerun()
-
-# -------------------- AUTH UI --------------------
+# -------------------- LOGIN UI --------------------
 def login_ui():
-    st.sidebar.markdown("### 🔐 Login or Sign Up")
+    st.sidebar.markdown("### 🔐 Login")
+    with st.sidebar.form("login_form"):
+        email = st.text_input("📧 Email")
+        name = st.text_input("👤 Name")
+        submitted = st.form_submit_button("Login")
 
-    google_link = (
-        f"https://accounts.google.com/o/oauth2/v2/auth?client_id={st.secrets['GOOGLE_CLIENT_ID']}"
-        f"&response_type=code&scope=openid%20email%20profile"
-        f"&redirect_uri=https://lazyapply.streamlit.app/oauth2callback"
-        f"&state=login&access_type=offline&prompt=consent&provider=google"
-    )
+        if submitted and email:
+            st.session_state.logged_in = True
+            st.session_state.email = email
+            st.session_state.name = name if name else "Guest"
 
+            # Save to DB if not exists
+            c.execute("SELECT * FROM users WHERE email = ?", (email,))
+            if not c.fetchone():
+                c.execute("INSERT INTO users (email, name) VALUES (?, ?)", (email, st.session_state.name))
+                conn.commit()
 
-    
+            # Also save to CSV for backup
+            if not os.path.exists("users.csv"):
+                pd.DataFrame(columns=["email", "name"]).to_csv("users.csv", index=False)
 
-    st.sidebar.markdown(f"[🔐 Login with Google]({google_link})", unsafe_allow_html=True)
-    #st.sidebar.markdown(f"[💻 Login with GitHub]({github_link})", unsafe_allow_html=True)
+            df = pd.read_csv("users.csv")
+            if email not in df["email"].values:
+                df.loc[len(df)] = [email, st.session_state.name]
+                df.to_csv("users.csv", index=False)
 
-# -------------------- AUTH CHECK --------------------
-handle_oauth_callback()
+            st.success(f"✅ Logged in as {st.session_state.name}")
+            st.rerun()
 
-if not st.session_state.logged_in:
-    login_ui()
-else:
+# -------------------- PAGE CONFIG --------------------
+st.set_page_config(page_title="LazyApply AI", layout="centered")
+
+# -------------------- LOGOUT UI --------------------
+if st.session_state.logged_in:
     st.sidebar.markdown(f"👋 Welcome, **{st.session_state.name}**")
     if st.sidebar.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
-# -------ssion_state.clear()
-    st.rerun()
+else:
+    login_ui()
 
         
 # -------------------- CACHE JOBS --------------------

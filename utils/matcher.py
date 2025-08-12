@@ -52,7 +52,7 @@ Compare the following resume with the job description and return:
 - A brief feedback summary
 - 3 highlighted matches
 - 3 missing skills
-- A match score out of 100
+-  Assign a Match Score out of 100 and explain it, note that it is extremely important that the match score is consistent everytime and that it has to be accurate and precise, also it has to be brutally honest and not lenient
 
 Resume:
 {resume_text}
