@@ -36,7 +36,7 @@ PART 2: Role Alignment
 - Compare resume to the job description
 - Highlight 5 strong alignment areas
 - List 5 key missing skills or phrases
-- Assign a Match Score out of 100 and explain it
+- Assign a Match Score out of 100 and explain it, note that it is extremely important that the match score is consistent everytime and that it has to be accurate and precise, also it has to be brutally honest and not lenient
 
 PART 3: ATS Optimization
 - Rewrite the resume fully optimized for ATS
