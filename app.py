@@ -181,7 +181,7 @@ with tab1:
     st.markdown("Upload your resume and paste a job description to get tailored AI feedback.") 
     st.markdown("💡 Tip: Use your favorite job post!")
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
-    jd_text = st.text_area("💼 Paste the job description here", height=250)
+    jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
 
     mode = st.selectbox("🧠 Choose AI Analysis Mode", [
         "Brutal Resume Review",
@@ -230,8 +230,8 @@ with tab1:
 
     # (no re-run processing)
     if st.session_state.get("feedback"):
-        st.text_area("📊 AI Feedback", st.session_state["feedback"], height=300)
-
+        st.markdown(st.session_state["feedback"])
+        raw_feedback = st.session_state["feedback"]
         col1, col2 = st.columns(2)
         with col1:
             if st.button("📋 Copy to Clipboard"):
@@ -242,7 +242,7 @@ with tab1:
             feedback_bytes = BytesIO(st.session_state["feedback"].encode())
             st.download_button(
                 label="📥 Download Feedback",
-                data=feedback_bytes,
+                data=raw_feedback.encode("utf-8"),
                 file_name="resume_feedback.txt",
                 mime="text/plain"
             )
