@@ -180,8 +180,8 @@ tab1, tab2 = st.tabs([" Match Resume", " Explore Jobs"])
 with tab1:
     st.markdown("Upload your resume and paste a job description to get tailored AI feedback.") 
     st.markdown("💡 Tip: Use your favorite job post!")
-    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"], help="Only used locally. Never leaves your browser.")
-    jd_text = st.text_area("💼 Paste the job description here", height=250, placeholder="Copy from LinkedIn, Naukri, or anywhere... 📝")
+    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
+    jd_text = st.text_area("💼 Paste the job description here", height=250)
 
     mode = st.selectbox("🧠 Choose AI Analysis Mode", [
         "Brutal Resume Review",
@@ -203,7 +203,7 @@ with tab1:
     chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
 
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
-    submitted = st.button("🚀 Generate Feedback", help="Click once both resume and JD are ready")
+    submitted = st.button("🚀 Generate Feedback")
 
     if submitted and resume_text and resume_text.strip() and jd_text.strip():
         key_hash = hash(resume_text + jd_text + mode + section + chosen_model)
@@ -220,21 +220,33 @@ with tab1:
                 st.session_state["input_hash"] = key_hash
                 st.session_state["feedback"] = str(result)
                 st.session_state["copied"] = False
-
                 save_match(resume_text, jd_text, result)
-        else:
-            result = st.session_state["feedback"]
-
-        result = str(result) if result else "⚠️ No result generated."
-        st.text_area("📊 AI Feedback", result, height=300)
 
     elif submitted:
-        if not uploaded_file and not jd_text.strip():
-            st.info("Upload your resume and paste a job description to begin.")
-        elif not uploaded_file:
+        if not uploaded_file:
             st.warning("Please upload your resume.")
         elif not jd_text.strip():
             st.warning("Please paste a job description.")
+
+    # (no re-run processing)
+    if st.session_state.get("feedback"):
+        st.text_area("📊 AI Feedback", st.session_state["feedback"], height=300)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📋 Copy to Clipboard"):
+                st.session_state["copied"] = True
+                st.write("✅ Copied to clipboard! (You may need to paste manually depending on browser)")
+
+        with col2:
+            feedback_bytes = BytesIO(st.session_state["feedback"].encode())
+            st.download_button(
+                label="📥 Download Feedback",
+                data=feedback_bytes,
+                file_name="resume_feedback.txt",
+                mime="text/plain"
+            )
+
 
 with tab2:
     st.markdown("🧠 Browse and filter jobs from multiple companies:")
