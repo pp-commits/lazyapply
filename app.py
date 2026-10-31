@@ -14,6 +14,8 @@ from utils.matcher import (
 from utils.prompt_templates import build_prompt
 from utils.job_scraper.common import (
     fetch_greenhouse_jobs,
+    fetch_workday_jobs,
+    fetch_workday_job_description,
     fetch_full_job_description,
     filter_jobs,
     validate_cached_jobs,
@@ -26,6 +28,13 @@ SUPPORTED_COMPANIES = {
     "Postman": "postman",
     "Turing": "turing",
     "Groww": "groww"
+}
+WORKDAY_COMPANIES = {
+    "Postman": {
+        "base_url": "https://postman.wd108.myworkdayjobs.com",
+        "tenant": "postman",
+        "site": "careers",
+    }
 }
 
 # -------------------- DB INIT --------------------
@@ -104,12 +113,21 @@ if not isinstance(st.session_state.get("job_cache"), dict):
     all_jobs = {}
     job_fetch_errors = []
     for comp_name, slug in SUPPORTED_COMPANIES.items():
-        jobs = fetch_greenhouse_jobs(
-            slug,
-            limit=3,
-            keyword="engineering",
-            on_error=job_fetch_errors.append,
-        )
+        if comp_name in WORKDAY_COMPANIES:
+            workday = WORKDAY_COMPANIES[comp_name]
+            jobs = fetch_workday_jobs(
+                **workday,
+                limit=3,
+                keyword="engineering",
+                on_error=job_fetch_errors.append,
+            )
+        else:
+            jobs = fetch_greenhouse_jobs(
+                slug,
+                limit=3,
+                keyword="engineering",
+                on_error=job_fetch_errors.append,
+            )
         all_jobs[comp_name] = jobs
     st.session_state["job_cache"] = all_jobs
     st.session_state["job_fetch_errors"] = job_fetch_errors
@@ -224,8 +242,8 @@ with tab1:
         "Entire Resume", "Professional Summary", "Experience", "Education", "Projects"
     ]) if mode == "Rewrite to Sound Results-Driven" else "Entire Resume"
 
-    model_choice = st.radio("Choose model:", ["Exaone (Deep & Accurate)", "Mistral (Fast & Light)"], index=0, horizontal=True)
-    chosen_model = "lgai/exaone-3-5-32b-instruct" if "Exaone" in model_choice else "mistralai/Mistral-7B-Instruct-v0.2"
+    model_choice = st.radio("Choose model:", ["GPT-OSS 120B (Deep)", "Qwen3.5 9B (Light)"], index=0, horizontal=True)
+    chosen_model = "openai/gpt-oss-120b" if "GPT-OSS" in model_choice else "Qwen/Qwen3.5-9B"
 
     resume_text = parse_resume(uploaded_file) if uploaded_file else None
     submitted = st.button("🚀 Generate Feedback")
@@ -311,12 +329,18 @@ with tab2:
                     if st.button(f"⚡ Match My Resume with {job['title']} ({job['company']})", key=unique_key):
                         resume_text = parse_resume(uploaded_file)
                         with st.spinner("Matching in progress..."):
-                            feedback = get_match_feedback(resume_text, job['summary'])
-                        st.success("✅ Match completed!")
-                        st.text_area(
-                            "📊 Feedback",
-                            feedback if isinstance(feedback, str) else feedback[0],
-                            height=300
-                        )
+                            job_description = job.get("summary", "")
+                            if job.get("description_url"):
+                                job_description = fetch_workday_job_description(job["description_url"])
+                            feedback = get_match_feedback(resume_text, job_description) if job_description else None
+                        if feedback is None:
+                            st.error("Could not load this job description, so resume matching was skipped.")
+                        else:
+                            st.success("✅ Match completed!")
+                            st.text_area(
+                                "📊 Feedback",
+                                feedback if isinstance(feedback, str) else feedback[0],
+                                height=300
+                            )
                 else:
                     st.info("Upload resume in Tab 1 to enable matching.")

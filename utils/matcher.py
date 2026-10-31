@@ -9,9 +9,9 @@ headers = {
     "Content-Type": "application/json"
 }
 
-MAIN_MODEL = "lgai/exaone-3-5-32b-instruct"
-LIGHT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
-API_URL = "https://api.together.xyz/v1/chat/completions"
+MAIN_MODEL = "openai/gpt-oss-120b"
+LIGHT_MODEL = "Qwen/Qwen3.5-9B"
+API_URL = "https://api.together.ai/v1/chat/completions"
 
 def call_together_api(prompt, model=MAIN_MODEL, temperature=0.7):
     payload = {
@@ -24,7 +24,7 @@ def call_together_api(prompt, model=MAIN_MODEL, temperature=0.7):
         "temperature": temperature
     }
 
-    response = requests.post(API_URL, headers=headers, json=payload)
+    response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
 
     if response.status_code == 200:
         return response.json()["choices"][0]["message"]["content"].strip()

@@ -3,7 +3,13 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from utils.job_scraper.common import fetch_greenhouse_jobs, filter_jobs, validate_cached_jobs
+from utils.job_scraper.common import (
+    fetch_greenhouse_jobs,
+    fetch_workday_jobs,
+    fetch_workday_job_description,
+    filter_jobs,
+    validate_cached_jobs,
+)
 
 
 def greenhouse_job(title="Software Engineer"):
@@ -121,6 +127,69 @@ class FetchGreenhouseJobsTests(unittest.TestCase):
         self.assertEqual(results["broken"], [])
         self.assertEqual(len(results["also-working"]), 1)
         self.assertEqual(len(errors), 1)
+
+
+class FetchWorkdayJobsTests(unittest.TestCase):
+    @patch("utils.job_scraper.common.requests.post")
+    def test_success_returns_normalized_workday_postings(self, post):
+        response = Mock()
+        response.json.return_value = {
+            "jobPostings": [{
+                "title": "Senior Software Engineer",
+                "locationsText": "Bengaluru, India",
+                "externalPath": "/job/Bengaluru/Senior-Software-Engineer_JR1000001",
+            }]
+        }
+        post.return_value = response
+
+        jobs = fetch_workday_jobs(
+            "https://postman.wd108.myworkdayjobs.com",
+            "postman",
+            "careers",
+            limit=3,
+            keyword="engineering",
+        )
+
+        post.assert_called_once_with(
+            "https://postman.wd108.myworkdayjobs.com/wday/cxs/postman/careers/jobs",
+            json={"appliedFacets": {}, "limit": 3, "offset": 0, "searchText": "engineering"},
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            timeout=10,
+        )
+        self.assertEqual(jobs[0]["company"], "Postman")
+        self.assertEqual(jobs[0]["location"], "Bengaluru, India")
+        self.assertEqual(
+            jobs[0]["link"],
+            "https://postman.wd108.myworkdayjobs.com/careers/job/Bengaluru/Senior-Software-Engineer_JR1000001",
+        )
+        self.assertTrue(jobs[0]["description_url"].endswith("/wday/cxs/postman/careers/job/Bengaluru/Senior-Software-Engineer_JR1000001"))
+
+    @patch("utils.job_scraper.common.requests.post")
+    def test_malformed_workday_response_returns_empty_list_and_reports_error(self, post):
+        response = Mock()
+        response.json.return_value = {"jobs": []}
+        post.return_value = response
+        errors = []
+        jobs = fetch_workday_jobs(
+            "https://postman.wd108.myworkdayjobs.com",
+            "postman",
+            "careers",
+            on_error=errors.append,
+        )
+        self.assertEqual(jobs, [])
+        self.assertTrue(any("jobPostings list" in message for message in errors))
+
+    @patch("utils.job_scraper.common.requests.get")
+    def test_workday_description_html_is_extracted(self, get):
+        response = Mock()
+        response.json.return_value = {
+            "jobPostingInfo": {"jobDescription": "<div><b>Build APIs</b><p>Ship reliable software.</p></div>"}
+        }
+        get.return_value = response
+        self.assertEqual(
+            fetch_workday_job_description("https://example.test/description"),
+            "Build APIs\nShip reliable software.",
+        )
 
 
 if __name__ == "__main__":
