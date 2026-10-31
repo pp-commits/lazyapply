@@ -12,7 +12,12 @@ from utils.matcher import (
     extract_score
 )
 from utils.prompt_templates import build_prompt
-from utils.job_scraper.common import fetch_greenhouse_jobs, fetch_full_job_description
+from utils.job_scraper.common import (
+    fetch_greenhouse_jobs,
+    fetch_full_job_description,
+    filter_jobs,
+    validate_cached_jobs,
+)
 from utils.history import save_match, get_history
 
 # -------------------- CONFIG --------------------
@@ -95,12 +100,32 @@ st.set_page_config(page_title="LazyApply AI", layout="centered")
 
         
 # -------------------- CACHE JOBS --------------------
-if "job_cache" not in st.session_state:
+if not isinstance(st.session_state.get("job_cache"), dict):
     all_jobs = {}
+    job_fetch_errors = []
     for comp_name, slug in SUPPORTED_COMPANIES.items():
-        jobs = fetch_greenhouse_jobs(slug, limit=3, keyword="engineering")
+        jobs = fetch_greenhouse_jobs(
+            slug,
+            limit=3,
+            keyword="engineering",
+            on_error=job_fetch_errors.append,
+        )
         all_jobs[comp_name] = jobs
     st.session_state["job_cache"] = all_jobs
+    st.session_state["job_fetch_errors"] = job_fetch_errors
+else:
+    # Session state can survive reruns and may contain stale or malformed values.
+    cached_jobs = st.session_state["job_cache"]
+    normalized_cache = {}
+    for comp_name in SUPPORTED_COMPANIES:
+        raw_jobs = cached_jobs.get(comp_name, [])
+        valid_jobs = validate_cached_jobs(raw_jobs)
+        if not isinstance(raw_jobs, list) or len(valid_jobs) != len(raw_jobs):
+            st.warning(f"Some cached job data for {comp_name} was invalid and has been skipped.")
+        normalized_cache[comp_name] = valid_jobs
+    st.session_state["job_cache"] = normalized_cache
+    if not isinstance(st.session_state.get("job_fetch_errors"), list):
+        st.session_state["job_fetch_errors"] = []
 
 # -------------------- STYLING --------------------
 st.markdown("""
@@ -251,6 +276,10 @@ with tab1:
 with tab2:
     st.markdown("🧠 Browse and filter jobs from multiple companies:")
 
+    for fetch_error in st.session_state.get("job_fetch_errors", []):
+        if isinstance(fetch_error, str):
+            st.warning(fetch_error)
+
     # Company filter (multi-select)
     selected_companies = st.multiselect(
         "🏢 Choose companies",
@@ -262,12 +291,11 @@ with tab2:
     keyword = st.text_input("🔍 Search by keyword", value="", placeholder="e.g., engineering, backend, data...").strip()
 
     # Collect matching jobs
-    filtered_jobs = []
-    for comp_name in selected_companies:
-        jobs = st.session_state["job_cache"].get(comp_name, [])
-        for job in jobs:
-            if not keyword or keyword.lower() in job['title'].lower():
-                filtered_jobs.append({**job, "company": comp_name})
+    filtered_jobs = filter_jobs(
+        st.session_state.get("job_cache"),
+        selected_companies,
+        keyword,
+    )
 
     if not filtered_jobs:
         st.warning("No jobs found for the selected filters.")
